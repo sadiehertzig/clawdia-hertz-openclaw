@@ -1,0 +1,18 @@
+# secrets
+.env
+*.pem
+*.key
+openclaw.json
+
+# server runtime / session state
+.openclaw/
+**/.openclaw/**
+
+# agent memory and transient state
+agents/*/memory/
+agents/*/data/
+agents/*/sessions/
+agents/*/logs/
+
+# macOS noise
+.DS_Store
