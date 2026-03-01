@@ -10,6 +10,9 @@ openclaw.json
 
 # agent memory and transient state
 agents/*/memory/
+!agents/*/memory/
+!agents/*/memory/docs/
+!agents/*/memory/docs/**
 agents/*/data/
 agents/*/sessions/
 agents/*/logs/
