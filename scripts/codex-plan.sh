@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
+TASK=$1
+
+if [ -z "$TASK" ]; then
+ echo "Usage: codex-plan.sh <taskfile>"
+ exit 1
+fi
+
+if [ ! -f "$TASK" ]; then
+ echo "Error: task file not found: $TASK"
+ exit 1
+fi
+
+#!/usr/bin/env bash
 
 TASK=$1
 
