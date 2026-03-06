@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "research-paper-writer": {
+      "version": "0.1.0",
+      "installedAt": 1772816969855
+    },
+    "academic-deep-research": {
+      "version": "1.0.0",
+      "installedAt": 1772817595118
+    },
+    "study-habits": {
+      "version": "1.0.0",
+      "installedAt": 1772817598080
+    },
+    "frontend-design": {
+      "version": "1.0.0",
+      "installedAt": 1772817609044
+    },
+    "resume-builder": {
+      "version": "1.0.0",
+      "installedAt": 1772817612119
+    }
+  }
+}
