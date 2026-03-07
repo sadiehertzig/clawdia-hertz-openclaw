@@ -19,3 +19,4 @@ agents/*/logs/
 
 # macOS noise
 .DS_Store
+runtime_state/
