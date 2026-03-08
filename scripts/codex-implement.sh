@@ -84,6 +84,14 @@ if (!dossier) {
   throw new Error(`Could not load dossier for session_id=${sessionId} request_id=${requestId}`);
 }
 
+function extractFinalStatus(logText) {
+  const matches = [...logText.matchAll(/^FINAL_STATUS:\s*(success|failure)\s*$/gim)];
+  if (matches.length === 0) {
+    return null;
+  }
+  return matches[matches.length - 1][1].toLowerCase();
+}
+
 let semanticStatus = "success";
 let summary = "codex implementation run completed";
 
@@ -91,17 +99,29 @@ if (exitCode !== 0) {
   semanticStatus = "error";
   summary = "codex implementation run failed";
 } else {
-  const logText = fs.readFileSync(logPath, "utf8");
+  let logText;
 
-  if (/FINAL_STATUS:\s*failure/i.test(logText)) {
+  try {
+    logText = fs.readFileSync(logPath, "utf8");
+  } catch (err) {
     semanticStatus = "error";
-    summary = "codex implementation run completed but reported task failure";
-  } else if (/FINAL_STATUS:\s*success/i.test(logText)) {
-    semanticStatus = "success";
-    summary = "codex implementation run completed";
-  } else {
-    semanticStatus = "error";
-    summary = "codex implementation run completed without a final status marker";
+    summary = "codex implementation run completed but log output could not be read";
+    logText = null;
+  }
+
+  if (logText !== null) {
+    const finalStatus = extractFinalStatus(logText);
+
+    if (finalStatus === "failure") {
+      semanticStatus = "error";
+      summary = "codex implementation run completed but reported task failure";
+    } else if (finalStatus === "success") {
+      semanticStatus = "success";
+      summary = "codex implementation run completed";
+    } else {
+      semanticStatus = "error";
+      summary = "codex implementation run completed without a final status marker";
+    }
   }
 }
 
@@ -133,3 +153,4 @@ fi
 git diff --stat
 
 exit "$CODEX_EXIT"
+
