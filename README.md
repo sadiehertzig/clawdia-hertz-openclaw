@@ -1,5 +1,7 @@
 # Codex Workflow
 
+This repository contains the GatorBots help desk runtime integration.
+
 Run planning only:
 
 ```bash
