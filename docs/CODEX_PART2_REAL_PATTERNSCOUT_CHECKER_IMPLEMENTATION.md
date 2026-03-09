@@ -141,7 +141,7 @@ Patch the active runtime entrypoint and supporting files as needed, likely under
 - `agents/clawdia/runtime/helpdesk_orchestrator.js`
 - `agents/clawdia/runtime/worker_adapters.js`
 - the file that actually implements `callWorker(...)`
-- `docs/runtime/openclaw.template.json`
+- `~/.openclaw/openclaw.json`
 
 ### 4.4 Tests and fixtures
 Current repository state:
@@ -594,7 +594,7 @@ Do not let Checker mark the final answer as reviewed. Checker only contributes v
 
 ## 9. Config additions
 
-Update `docs/runtime/openclaw.template.json` or the repo’s equivalent runtime template to include sane defaults for both workers.
+Update `~/.openclaw/openclaw.json` or the repo’s equivalent runtime template to include sane defaults for both workers.
 
 Minimum config sections to document:
 

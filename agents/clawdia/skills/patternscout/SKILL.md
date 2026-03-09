@@ -10,9 +10,10 @@ metadata: {"openclaw":{"requires":{"bins":["rg","gh"]}}}
 ## Retrieval Order
 
 1. Local team sources and repo mirrors
-2. Curated local docs memory
-3. Official/approved examples
-4. Remote GitHub fallback (cached)
+2. Learned pattern cards from successful prior dossiers
+3. Curated local docs memory
+4. Official/approved examples
+5. Remote GitHub fallback scoped to curated high-quality repos (cached)
 
 ## Output Contract
 
@@ -24,9 +25,15 @@ Return:
 - `retrieval_latency_ms`
 - `source_tiers_used`
 - `confidence`
+- `source_receipts`
+- `freshness_badge`
 
 ## Rules
 
 - Prefer team and official sources before random public snippets.
+- Weight candidate repositories by quality, recency, officialness, dynamic learned performance, and intent alignment.
+- Keep retrieval diverse: cap repeated snippets per repo so answers cite multiple sources.
+- Include evidence receipts for top sources to support explainability.
 - If retrieval is sparse, say so explicitly in coverage/confidence.
-- Cache remote fallback queries with a 24h TTL.
+- Cache retrieval queries with a bounded TTL and include registry/weight file versions in cache keying.
+- Learn over time: nightly jobs should update source weights and rebuild pattern cards from labeled outcomes.

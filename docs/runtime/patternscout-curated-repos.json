@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "generated_at": "2026-03-09T00:00:00Z",
+  "notes": "Curated high-signal FRC repositories for PatternScout weighted retrieval.",
+  "repos": [
+    {
+      "id": "wpilibsuite/allwpilib",
+      "quality_score": 98,
+      "official": true,
+      "archived": false,
+      "last_updated": "2026-01-16",
+      "base_weight": 1.2,
+      "style_family": "wpilib-reference",
+      "tags": ["official", "api", "wpilib", "java", "tested", "reliable"],
+      "evidence_note": "official wpilib source"
+    },
+    {
+      "id": "wpilibsuite/frc-docs",
+      "quality_score": 96,
+      "official": true,
+      "archived": false,
+      "last_updated": "2026-03-01",
+      "base_weight": 1.15,
+      "style_family": "wpilib-docs",
+      "tags": ["official", "docs", "api", "best-practices"],
+      "evidence_note": "official frc docs"
+    },
+    {
+      "id": "Mechanical-Advantage/RobotCode2026Public",
+      "quality_score": 94,
+      "official": false,
+      "archived": false,
+      "last_updated": "2026-03-06",
+      "base_weight": 1.12,
+      "style_family": "advantagekit-architecture",
+      "tags": ["competition-code", "java", "swerve", "vision", "advantagekit", "reliable"],
+      "evidence_note": "active top-tier public competition code"
+    },
+    {
+      "id": "Mechanical-Advantage/AdvantageKit",
+      "quality_score": 92,
+      "official": false,
+      "archived": false,
+      "last_updated": "2026-02-25",
+      "base_weight": 1.1,
+      "style_family": "advantagekit",
+      "tags": ["logging", "architecture", "replay", "telemetry", "tested"],
+      "evidence_note": "widely-used frc telemetry framework"
+    },
+    {
+      "id": "Team254/FRC-2025-Public",
+      "quality_score": 88,
+      "official": false,
+      "archived": false,
+      "last_updated": "2025-09-09",
+      "base_weight": 1.03,
+      "style_family": "team254",
+      "tags": ["competition-code", "java", "architecture", "swerve"],
+      "evidence_note": "high quality team architecture patterns"
+    },
+    {
+      "id": "frc1678/C2025-Public",
+      "quality_score": 84,
+      "official": false,
+      "archived": false,
+      "last_updated": "2025-05-22",
+      "base_weight": 1.0,
+      "style_family": "citrus-circuits",
+      "tags": ["competition-code", "java", "controls"],
+      "evidence_note": "strong practical competition patterns"
+    },
+    {
+      "id": "FRCTeam2910/2025CompetitionRobot-Public",
+      "quality_score": 76,
+      "official": false,
+      "archived": true,
+      "last_updated": "2025-06-27",
+      "base_weight": 0.85,
+      "style_family": "team2910",
+      "tags": ["competition-code", "archived", "swerve"],
+      "evidence_note": "useful historical reference; archived"
+    }
+  ]
+}

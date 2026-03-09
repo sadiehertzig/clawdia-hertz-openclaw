@@ -101,6 +101,8 @@ function adaptPatternScoutOutput(raw, requestId) {
   envelope.coverage_note = source.coverage_note || (envelope.matches.length ? 'retrieval coverage available' : 'retrieval coverage is thin');
   envelope.retrieval_latency_ms = Number(source.retrieval_latency_ms || envelope.telemetry_hints.elapsed_time_ms || 0);
   envelope.source_tiers_used = asArray(source.source_tiers_used);
+  envelope.source_receipts = asArray(source.source_receipts);
+  envelope.freshness_badge = source.freshness_badge || null;
   envelope.confidence = source.confidence || (envelope.matches.length >= 3 ? 'high' : envelope.matches.length >= 1 ? 'medium' : 'low');
 
   return envelope;
@@ -222,6 +224,41 @@ function adaptDeepDebugOutput(raw, requestId) {
   return envelope;
 }
 
+function adaptCoachEvaluatorOutput(raw, requestId) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+
+  const envelope = normalizeEnvelope('coach_evaluator', requestId, source, {
+    kind: 'quality_evaluation',
+    summary: source.summary || 'quality evaluation complete',
+    contract_flags: {
+      reviewed: false,
+      escalated: false,
+      implementation_safe: Boolean(source.contract_flags?.implementation_safe),
+      pattern_only: false
+    }
+  });
+
+  const incomingScores = source.scores && typeof source.scores === 'object' ? source.scores : {};
+  envelope.overall_score = Number.isFinite(Number(source.overall_score))
+    ? Number(source.overall_score)
+    : (Number.isFinite(Number(incomingScores.overall)) ? Number(incomingScores.overall) : null);
+  envelope.confidence = source.confidence || null;
+  envelope.scores = {
+    overall: Number.isFinite(Number(incomingScores.overall)) ? Number(incomingScores.overall) : envelope.overall_score,
+    correctness: Number.isFinite(Number(incomingScores.correctness)) ? Number(incomingScores.correctness) : null,
+    safety: Number.isFinite(Number(incomingScores.safety)) ? Number(incomingScores.safety) : null,
+    teaching: Number.isFinite(Number(incomingScores.teaching)) ? Number(incomingScores.teaching) : null,
+    evidence: Number.isFinite(Number(incomingScores.evidence)) ? Number(incomingScores.evidence) : null
+  };
+  envelope.flags = asArray(source.flags);
+  envelope.recommendations = asArray(source.recommendations);
+  envelope.metrics = source.metrics && typeof source.metrics === 'object'
+    ? source.metrics
+    : {};
+
+  return envelope;
+}
+
 function adaptGenericOutput(raw, requestId, options) {
   return normalizeEnvelope('generic', requestId, raw, {
     kind: options?.defaultKind || 'generic',
@@ -243,6 +280,8 @@ function adaptWorkerOutput(worker, raw, requestId, options) {
       return adaptArbiterOutput(raw, requestId);
     case 'deepdebug':
       return adaptDeepDebugOutput(raw, requestId);
+    case 'coach_evaluator':
+      return adaptCoachEvaluatorOutput(raw, requestId);
     default:
       return adaptGenericOutput(raw, requestId, options);
   }
@@ -256,6 +295,7 @@ module.exports = {
   adaptCheckerOutput,
   adaptArbiterOutput,
   adaptDeepDebugOutput,
+  adaptCoachEvaluatorOutput,
   adaptWorkerOutput,
   normalizeEnvelope
 };

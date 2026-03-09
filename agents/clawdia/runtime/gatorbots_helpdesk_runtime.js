@@ -70,16 +70,16 @@ function renderHumanDossier(dossierObj) {
   return dossier.renderHumanDossierNote(dossierObj);
 }
 
-function saveDossier(dossierObj) {
-  return dossier.saveDossier(dossierObj);
+function saveDossier(dossierObj, options) {
+  return dossier.saveDossier(dossierObj, options);
 }
 
-function loadLatestDossier(sessionId) {
-  return dossier.loadLatestDossier(sessionId);
+function loadLatestDossier(sessionId, options) {
+  return dossier.loadLatestDossier(sessionId, options);
 }
 
-function loadRequestDossier(sessionId, requestId) {
-  return dossier.loadRequestDossier(sessionId, requestId);
+function loadRequestDossier(sessionId, requestId, options) {
+  return dossier.loadRequestDossier(sessionId, requestId, options);
 }
 
 function quickClassify(prompt, options) {
@@ -100,6 +100,14 @@ function isWorkerAvailable(worker, runtimeCtx) {
 
 function writeHumanDossierNote(requestId, note, options) {
   return dossier.writeHumanDossierNote(requestId, note, options);
+}
+
+function setOutcomeLabel(dossierObj, label, options) {
+  return dossier.setOutcomeLabel(dossierObj, label, options);
+}
+
+function updateOutcomeLabel(requestId, label, options) {
+  return dossier.updateOutcomeLabel(requestId, label, options);
 }
 
 function orchestrateRequest(input, runtimeCtx) {
@@ -141,6 +149,8 @@ module.exports = {
   callWorker,
   isWorkerAvailable,
   writeHumanDossierNote,
+  setOutcomeLabel,
+  updateOutcomeLabel,
   orchestrateRequest,
   renderChatResponse
 };

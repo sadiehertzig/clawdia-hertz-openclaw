@@ -39,6 +39,7 @@
 ./agents/clawdia/SOUL.md
 ./agents/clawdia/TOOLS.md
 ./agents/clawdia/USER.md
+./agents/clawdia/runtime/coach_evaluator_worker.js
 ./agents/clawdia/runtime/dossier_helpers.js
 ./agents/clawdia/runtime/gatorbots_helpdesk_runtime.js
 ./agents/clawdia/runtime/helpdesk_orchestrator.js
@@ -98,7 +99,7 @@
 ./docs/ops/provider-failover-map.md
 ./docs/ops/telemetry-format.md
 ./docs/repo_index.md
-./docs/runtime/openclaw.template.json
+./docs/runtime/patternscout-curated-repos.json
 ./filename.txt
 ./memory/2026-03-09.md
 ./memory/CODEX_PART2_REAL_PATTERNSCOUT_CHECKER_IMPLEMENTATION.md
@@ -148,10 +149,18 @@
 ./runtime_state/dossiers/sessions/sess_manual-test_17a835b6a5/requests/req_mmgl5o1r_9183502e.md
 ./runtime_state/dossiers/sessions/sess_manual-test_17a835b6a5/requests/req_mmglk3dv_c4096287.json
 ./runtime_state/dossiers/sessions/sess_manual-test_17a835b6a5/requests/req_mmglk3dv_c4096287.md
+./runtime_state/patternscout/pattern_cards.json
+./runtime_state/patternscout/source_weights.json
 ./scripts/build-repo-index.sh
 ./scripts/codex-implement.sh
 ./scripts/codex-plan.sh
+./scripts/helpdesk-nightly-digest.js
+./scripts/label-dossier-outcome.js
+./scripts/patternscout-build-cards.js
 ./scripts/patternscout-cache.sh
+./scripts/patternscout-learn.js
+./scripts/validate-helpdesk-runtime.js
+./scripts/validate-patternscout-improvements.js
 ./tmp/backups/clawdia-hertz-openclaw-20260308-203919.tar.gz
 ./tmp/patternscout-cache/cache.json
 ./tmp/phase5-failure-task.md
@@ -161,4 +170,4 @@
 ./tmp/phase7.md
 ./tmp/phase8.md
 
-Index generated at Mon Mar  9 02:03:21 UTC 2026
+Index generated at Mon Mar  9 02:57:27 UTC 2026

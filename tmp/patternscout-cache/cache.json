@@ -1,0 +1,1670 @@
+{
+  "df51cc55fcfa076644c3b5ba2d365754c8a4212b": {
+    "ts": 1773005378930,
+    "matches": []
+  },
+  "a8af5b320b976e42e689235038e4871960f61c55": {
+    "ts": 1773008837734,
+    "normalized": {
+      "raw": "phoenix6 current limits",
+      "tokens": [
+        "phoenix6",
+        "current",
+        "limits"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [],
+    "summary": "No retrieval matches found",
+    "retrieval_summary": "No retrieval matches found",
+    "coverage_note": "No strong match; retrieval was sparse across configured lanes.",
+    "source_tiers_used": [],
+    "confidence": "low",
+    "warnings": [
+      "github fallback disabled"
+    ]
+  },
+  "bc8ab0aa8486a35dff4a0685072c1bf9ecedc794": {
+    "ts": 1773021177496,
+    "normalized": {
+      "raw": "phoenix6 current limits",
+      "tokens": [
+        "phoenix6",
+        "phoenix",
+        "6",
+        "current",
+        "limits"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [
+        "phoenix6",
+        "phoenix"
+      ],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 9,
+        "line_end": 9,
+        "symbol": "phoenix6",
+        "snippet": "\"raw\": \"phoenix6 current limits\",",
+        "score": 60,
+        "why_matched": "matched token/symbol: phoenix6",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 34,
+        "line_end": 34,
+        "symbol": "phoenix6",
+        "snippet": "\"raw\": \"phoenix6 current limits\",",
+        "score": 60,
+        "why_matched": "matched token/symbol: phoenix6",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "phoenix6",
+        "snippet": "\"phoenix6\",",
+        "score": 52,
+        "why_matched": "matched token/symbol: phoenix6",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 36,
+        "line_end": 36,
+        "symbol": "phoenix6",
+        "snippet": "\"phoenix6\",",
+        "score": 52,
+        "why_matched": "matched token/symbol: phoenix6",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "87d7ef673640fc7bd9f8f101c5adbedd132e8afb": {
+    "ts": 1773021177527,
+    "normalized": {
+      "raw": "nonexistenttokenxyzabc",
+      "tokens": [
+        "nonexistenttokenxyzabc"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 117,
+        "line_end": 117,
+        "symbol": "nonexistenttokenxyzabc",
+        "snippet": "\"raw\": \"nonexistenttokenxyzabc\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: nonexistenttokenxyzabc",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 119,
+        "line_end": 119,
+        "symbol": "nonexistenttokenxyzabc",
+        "snippet": "\"nonexistenttokenxyzabc\"",
+        "score": 44,
+        "why_matched": "matched token/symbol: nonexistenttokenxyzabc",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 135,
+        "line_end": 135,
+        "symbol": "nonexistenttokenxyzabc",
+        "snippet": "\"symbol\": \"nonexistenttokenxyzabc\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: nonexistenttokenxyzabc",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 136,
+        "line_end": 136,
+        "symbol": "nonexistenttokenxyzabc",
+        "snippet": "\"snippet\": \"    \\\"ts\\\": 1773009071880,\\n    \\\"normalized\\\": {\\n      \\\"raw\\\": \\\"nonexistenttokenxyzabc\\\",\\n      \\\"tokens\\\": [\\n        \\\"nonexistenttokenxyzabc\\\"\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: nonexistenttokenxyzabc",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "548a72d8bfa319ca916787531f0806a0439949b7": {
+    "ts": 1773021178408,
+    "normalized": {
+      "raw": "Write a command-based intake subsystem for our FRC robot",
+      "tokens": [
+        "write",
+        "a",
+        "command",
+        "based",
+        "intake",
+        "subsystem",
+        "for",
+        "our",
+        "frc",
+        "robot"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "intake"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 18,
+        "line_end": 18,
+        "symbol": "subsystem",
+        "snippet": "\"subsystemHints\": [],",
+        "score": 48,
+        "why_matched": "matched token/symbol: subsystem",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 25,
+        "line_end": 25,
+        "symbol": "our",
+        "snippet": "\"source_tiers_used\": [],",
+        "score": 48,
+        "why_matched": "matched token/symbol: our",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 48,
+        "line_end": 48,
+        "symbol": "subsystem",
+        "snippet": "\"subsystemHints\": [],",
+        "score": 48,
+        "why_matched": "matched token/symbol: subsystem",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 54,
+        "line_end": 54,
+        "symbol": "a",
+        "snippet": "\"source_id\": \"clawdia-hertz-openclaw\",",
+        "score": 48,
+        "why_matched": "matched token/symbol: a",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "276949dc979f796281f5c046288dc7430055cf9f": {
+    "ts": 1773021178658,
+    "normalized": {
+      "raw": "What is the TalonFX constructor signature in Phoenix 6?",
+      "tokens": [
+        "what",
+        "is",
+        "the",
+        "talonfx",
+        "constructor",
+        "signature",
+        "in",
+        "phoenix",
+        "6"
+      ],
+      "phrases": [],
+      "symbols": [
+        "What",
+        "TalonFX",
+        "Phoenix"
+      ],
+      "vendorHints": [
+        "phoenix"
+      ],
+      "subsystemHints": [],
+      "docsHints": [
+        "constructor",
+        "signature"
+      ]
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase6-success-task.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "is",
+        "snippet": "This repository contains the GatorBots help desk runtime integration.",
+        "score": 53,
+        "why_matched": "matched token/symbol: is",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "is",
+        "snippet": "This repository contains the GatorBots help desk runtime integration.",
+        "score": 49,
+        "why_matched": "matched token/symbol: is",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase6-success-task.md",
+        "line_start": 1,
+        "line_end": 1,
+        "symbol": "the",
+        "snippet": "Add one harmless line to README.md under the title:",
+        "score": 49,
+        "why_matched": "matched token/symbol: the",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "is",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 49,
+        "why_matched": "matched token/symbol: is",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "7204a2efc769a8ae1afe63700c991019f8636c7b": {
+    "ts": 1773021178705,
+    "normalized": {
+      "raw": "CAN motor controller fault, sensor dropping frames, possible brownout",
+      "tokens": [
+        "can",
+        "motor",
+        "controller",
+        "fault",
+        "sensor",
+        "dropping",
+        "frames",
+        "possible",
+        "brownout"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/CLAWDIA_FULL_BUILDPLAN.md",
+        "line_start": 668,
+        "line_end": 668,
+        "symbol": "can",
+        "snippet": "- `sensor_or_can_fault`",
+        "score": 49,
+        "why_matched": "matched token/symbol: can",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/CLAWDIA_FULL_BUILDPLAN.md",
+        "line_start": 64,
+        "line_end": 64,
+        "symbol": "fault",
+        "snippet": "\"workerDefault\": \"sessions_spawn\"",
+        "score": 41,
+        "why_matched": "matched token/symbol: fault",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/CLAWDIA_FULL_BUILDPLAN.md",
+        "line_start": 129,
+        "line_end": 129,
+        "symbol": "fault",
+        "snippet": "\"defaultAgent\": \"clawdia\",",
+        "score": 41,
+        "why_matched": "matched token/symbol: fault",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/CLAWDIA_FULL_BUILDPLAN.md",
+        "line_start": 181,
+        "line_end": 181,
+        "symbol": "fault",
+        "snippet": "- Default routed agent:",
+        "score": 41,
+        "why_matched": "matched token/symbol: fault",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "7a823b22fd8657a3ea91389dd952256ce82d3148": {
+    "ts": 1773021178755,
+    "normalized": {
+      "raw": "Hard bug: root cause unknown, multi-file issue with pose estimator drift and CAN errors",
+      "tokens": [
+        "hard",
+        "bug",
+        "root",
+        "cause",
+        "unknown",
+        "multi",
+        "file",
+        "issue",
+        "with",
+        "pose",
+        "estimator",
+        "drift",
+        "and",
+        "can",
+        "errors"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Hard"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "CODEX_RULES.md",
+        "line_start": 18,
+        "line_end": 18,
+        "symbol": "root",
+        "snippet": "Allowed files in repo root",
+        "score": 45,
+        "why_matched": "matched token/symbol: root",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "CODEX_RULES.md",
+        "line_start": 25,
+        "line_end": 25,
+        "symbol": "file",
+        "snippet": "If a forbidden file must change stop and explain why.",
+        "score": 45,
+        "why_matched": "matched token/symbol: file",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "file",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 45,
+        "why_matched": "matched token/symbol: file",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 5,
+        "line_end": 5,
+        "symbol": "with",
+        "snippet": "End with:",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "45658651c2a372c97e325daab6b3076a5001c0af": {
+    "ts": 1773021178881,
+    "normalized": {
+      "raw": "Write FRC shooter subsystem with two Falcon motors",
+      "tokens": [
+        "write",
+        "frc",
+        "shooter",
+        "subsystem",
+        "with",
+        "two",
+        "falcon",
+        "motors"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write",
+        "Falcon"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "shooter"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 9,
+        "line_end": 9,
+        "symbol": "with",
+        "snippet": "**Have opinions.** You're allowed to disagree, prefer things, find stuff amusing or boring. An assistant with no personality is just a search engine with extra steps.",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "with",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 13,
+        "line_end": 13,
+        "symbol": "with",
+        "snippet": "**Earn trust through competence.** Your human gave you access to their stuff. Don't make them regret it. Be careful with external actions (emails, tweets, anything public). Be bold with internal ones (reading, organizing, learning).",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 15,
+        "line_end": 15,
+        "symbol": "with",
+        "snippet": "**Remember you're a guest.** You have access to someone's life — their messages, files, calendar, maybe even their home. That's intimacy. Treat it with respect.",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "f70d0f7193ec3e4e96cb1409dae462344520fdda": {
+    "ts": 1773021179007,
+    "normalized": {
+      "raw": "that didn't work, the motors spin opposite directions",
+      "tokens": [
+        "that",
+        "didn",
+        "t",
+        "work",
+        "the",
+        "motors",
+        "spin",
+        "opposite",
+        "directions"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 1,
+        "line_end": 1,
+        "symbol": "t",
+        "snippet": "Add one harmless line to README.md under the title:",
+        "score": 45,
+        "why_matched": "matched token/symbol: t",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "t",
+        "snippet": "This repository contains the GatorBots help desk runtime integration.",
+        "score": 45,
+        "why_matched": "matched token/symbol: t",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "CODEX_RULES.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "t",
+        "snippet": "Always follow this workflow.",
+        "score": 45,
+        "why_matched": "matched token/symbol: t",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "CODEX_RULES.md",
+        "line_start": 6,
+        "line_end": 6,
+        "symbol": "t",
+        "snippet": "2 Read the task file",
+        "score": 45,
+        "why_matched": "matched token/symbol: t",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "db382b79f30bce7a601c793e79a2435f7db95e5a": {
+    "ts": 1773021179059,
+    "normalized": {
+      "raw": "PhotonVision camera not detecting AprilTags, limelight alternative?",
+      "tokens": [
+        "photonvision",
+        "camera",
+        "not",
+        "detecting",
+        "apriltags",
+        "limelight",
+        "alternative"
+      ],
+      "phrases": [],
+      "symbols": [
+        "PhotonVision",
+        "AprilTags"
+      ],
+      "vendorHints": [
+        "photonvision",
+        "limelight"
+      ],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase7.md",
+        "line_start": 15,
+        "line_end": 15,
+        "symbol": "not",
+        "snippet": "- Do not change prompt contract",
+        "score": 41,
+        "why_matched": "matched token/symbol: not",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "not",
+        "snippet": "_You're not a chatbot. You're becoming someone._",
+        "score": 41,
+        "why_matched": "matched token/symbol: not",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 7,
+        "line_end": 7,
+        "symbol": "not",
+        "snippet": "**Be genuinely helpful, not performatively helpful.** Skip the \"Great question!\" and \"I'd be happy to help!\" — just help. Actions speak louder than filler words.",
+        "score": 41,
+        "why_matched": "matched token/symbol: not",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "not",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 41,
+        "why_matched": "matched token/symbol: not",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "c751552506a48c11767567e217d8df4e65b4d2e8": {
+    "ts": 1773021179179,
+    "normalized": {
+      "raw": "Create autonomous path with PathPlanner",
+      "tokens": [
+        "create",
+        "autonomous",
+        "path",
+        "with",
+        "pathplanner"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Create",
+        "PathPlanner"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 5,
+        "line_end": 5,
+        "symbol": "with",
+        "snippet": "End with:",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase6-success-task.md",
+        "line_start": 5,
+        "line_end": 5,
+        "symbol": "with",
+        "snippet": "End with:",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 9,
+        "line_end": 9,
+        "symbol": "with",
+        "snippet": "**Have opinions.** You're allowed to disagree, prefer things, find stuff amusing or boring. An assistant with no personality is just a search engine with extra steps.",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "with",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 41,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "3bde258efc2c0bc3c68f76f196d1410f0186a7a6": {
+    "ts": 1773021179290,
+    "normalized": {
+      "raw": "Write FRC arm subsystem",
+      "tokens": [
+        "write",
+        "frc",
+        "arm",
+        "subsystem"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "arm"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "AGENTS.md",
+        "line_start": 35,
+        "line_end": 35,
+        "symbol": "write",
+        "snippet": "- Write significant events, thoughts, decisions, opinions, lessons learned",
+        "score": 49,
+        "why_matched": "matched token/symbol: write",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "AGENTS.md",
+        "line_start": 39,
+        "line_end": 39,
+        "symbol": "write",
+        "snippet": "### 📝 Write It Down - No \"Mental Notes\"!",
+        "score": 49,
+        "why_matched": "matched token/symbol: write",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "IDENTITY.md",
+        "line_start": 10,
+        "line_end": 10,
+        "symbol": "arm",
+        "snippet": "_(how do you come across? sharp? warm? chaotic? calm?)_",
+        "score": 46,
+        "why_matched": "matched token/symbol: arm",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/phase5-success-task.md",
+        "line_start": 1,
+        "line_end": 1,
+        "symbol": "arm",
+        "snippet": "Add one harmless line to README.md under the title:",
+        "score": 46,
+        "why_matched": "matched token/symbol: arm",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "3669f6d91953bfc0ef2d9892536cb38ef68f0ade": {
+    "ts": 1773021179415,
+    "normalized": {
+      "raw": "Generate a FRC climber subsystem with two motors",
+      "tokens": [
+        "generate",
+        "a",
+        "frc",
+        "climber",
+        "subsystem",
+        "with",
+        "two",
+        "motors"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Generate"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "climber"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "HEARTBEAT.md",
+        "line_start": 3,
+        "line_end": 3,
+        "symbol": "a",
+        "snippet": "# Keep this file empty (or with only comments) to skip heartbeat API calls.",
+        "score": 45,
+        "why_matched": "matched token/symbol: a",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "README.md",
+        "line_start": 17,
+        "line_end": 17,
+        "symbol": "a",
+        "snippet": "`scripts/codex-implement.sh` now creates a runtime dossier at start and updates it again with the run result.",
+        "score": 45,
+        "why_matched": "matched token/symbol: a",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/repo_index.md",
+        "line_start": 43,
+        "line_end": 43,
+        "symbol": "a",
+        "snippet": "./agents/clawdia/skills/frc_codegen/SKILL.md",
+        "score": 45,
+        "why_matched": "matched token/symbol: a",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "docs/repo_index.md",
+        "line_start": 44,
+        "line_end": 44,
+        "symbol": "a",
+        "snippet": "./agents/clawdia/skills/frc_pitcrew/SKILL.md",
+        "score": 45,
+        "why_matched": "matched token/symbol: a",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "450cc62563ca632fba7d230af81c331e6ebf548c": {
+    "ts": 1773023088791,
+    "normalized": {
+      "raw": "Write an intake subsystem with TalonFX and beam break",
+      "tokens": [
+        "write",
+        "an",
+        "intake",
+        "subsystem",
+        "with",
+        "talonfx",
+        "and",
+        "beam",
+        "break"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write",
+        "TalonFX"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "intake",
+        "beam",
+        "break"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "CODEX_RULES.md",
+        "line_start": 25,
+        "line_end": 25,
+        "symbol": "an",
+        "snippet": "If a forbidden file must change stop and explain why.",
+        "score": 45,
+        "why_matched": "matched token/symbol: an",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 7,
+        "line_end": 7,
+        "symbol": "an",
+        "snippet": "**Be genuinely helpful, not performatively helpful.** Skip the \"Great question!\" and \"I'd be happy to help!\" — just help. Actions speak louder than filler words.",
+        "score": 45,
+        "why_matched": "matched token/symbol: an",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 9,
+        "line_end": 9,
+        "symbol": "an",
+        "snippet": "**Have opinions.** You're allowed to disagree, prefer things, find stuff amusing or boring. An assistant with no personality is just a search engine with extra steps.",
+        "score": 45,
+        "why_matched": "matched token/symbol: an",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "agents/arbiter/SOUL.md",
+        "line_start": 11,
+        "line_end": 11,
+        "symbol": "an",
+        "snippet": "**Be resourceful before asking.** Try to figure it out. Read the file. Check the context. Search for it. _Then_ ask if you're stuck. The goal is to come back with answers, not questions.",
+        "score": 45,
+        "why_matched": "matched token/symbol: an",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "2be65c5c94d4756b89873f6c364ac8dd1f84d47c": {
+    "ts": 1773023099229,
+    "normalized": {
+      "raw": "that didnt work still failing deploy",
+      "tokens": [
+        "that",
+        "didnt",
+        "work",
+        "still",
+        "failing",
+        "deploy"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 55,
+        "line_end": 55,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 68,
+        "line_end": 68,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 81,
+        "line_end": 81,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 94,
+        "line_end": 94,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "bde89682d701a1fbc4b4487d8ef8d6b2c77e8401": {
+    "ts": 1773023108643,
+    "normalized": {
+      "raw": "write subsystem and then that didnt work",
+      "tokens": [
+        "write",
+        "subsystem",
+        "and",
+        "then",
+        "that",
+        "didnt",
+        "work"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 18,
+        "line_end": 18,
+        "symbol": "subsystem",
+        "snippet": "\"subsystemHints\": [],",
+        "score": 44,
+        "why_matched": "matched token/symbol: subsystem",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 48,
+        "line_end": 48,
+        "symbol": "subsystem",
+        "snippet": "\"subsystemHints\": [],",
+        "score": 44,
+        "why_matched": "matched token/symbol: subsystem",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 55,
+        "line_end": 55,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 68,
+        "line_end": 68,
+        "symbol": "work",
+        "snippet": "\"repo\": \"workspace\",",
+        "score": 44,
+        "why_matched": "matched token/symbol: work",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "26aec269179a18754239944b3d39fb33cb0a7f96": {
+    "ts": 1773023118566,
+    "normalized": {
+      "raw": "build intake subsystem",
+      "tokens": [
+        "build",
+        "intake",
+        "subsystem"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [
+        "intake"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 193,
+        "line_end": 193,
+        "symbol": "intake",
+        "snippet": "\"raw\": \"Write a command-based intake subsystem for our FRC robot\",",
+        "score": 53,
+        "why_matched": "matched token/symbol: intake",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 199,
+        "line_end": 199,
+        "symbol": "intake",
+        "snippet": "\"intake\",",
+        "score": 49,
+        "why_matched": "matched token/symbol: intake",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 212,
+        "line_end": 212,
+        "symbol": "intake",
+        "snippet": "\"intake\"",
+        "score": 49,
+        "why_matched": "matched token/symbol: intake",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 18,
+        "line_end": 18,
+        "symbol": "subsystem",
+        "snippet": "\"subsystemHints\": [],",
+        "score": 44,
+        "why_matched": "matched token/symbol: subsystem",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "819ceb47d31ca8a164d2bd4915c6ac133d0959f1": {
+    "ts": 1773023162392,
+    "normalized": {
+      "raw": "deploy failed with vendor dep mismatch",
+      "tokens": [
+        "deploy",
+        "failed",
+        "with",
+        "vendor",
+        "dep",
+        "mismatch"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "scripts/codex-implement.sh",
+        "line_start": 54,
+        "line_end": 54,
+        "symbol": "with",
+        "snippet": "6 End your final response with exactly one of these lines:",
+        "score": 44,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "scripts/codex-implement.sh",
+        "line_start": 100,
+        "line_end": 100,
+        "symbol": "failed",
+        "snippet": "summary = \"codex implementation run failed\";",
+        "score": 44,
+        "why_matched": "matched token/symbol: failed",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "scripts/codex-implement.sh",
+        "line_start": 123,
+        "line_end": 123,
+        "symbol": "with",
+        "snippet": "summary = \"codex implementation run completed without a final status marker\";",
+        "score": 44,
+        "why_matched": "matched token/symbol: with",
+        "url": null
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "clawdia-hertz-openclaw",
+        "repo": "workspace",
+        "path": "scripts/codex-implement.sh",
+        "line_start": 150,
+        "line_end": 150,
+        "symbol": "failed",
+        "snippet": "echo \"Warning: failed to record dossier result, preserving original Codex exit code $CODEX_EXIT\" >&2",
+        "score": 44,
+        "why_matched": "matched token/symbol: failed",
+        "url": null
+      }
+    ],
+    "summary": "Found 4 match(es) across gatorbots",
+    "retrieval_summary": "Found 4 match(es) across gatorbots",
+    "coverage_note": "Strong local/official match coverage for this query.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "confidence": "high",
+    "warnings": []
+  },
+  "dbd863ac1a0f41af29743b2da5228118e3817256": {
+    "ts": 1773024323749,
+    "normalized": {
+      "raw": "Write an intake subsystem with TalonFX and beam break",
+      "tokens": [
+        "write",
+        "an",
+        "intake",
+        "subsystem",
+        "with",
+        "talonfx",
+        "and",
+        "beam",
+        "break"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write",
+        "TalonFX"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "intake",
+        "beam",
+        "break"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "workspace",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 193,
+        "line_end": 193,
+        "symbol": "write",
+        "snippet": "\"raw\": \"Write a command-based intake subsystem for our FRC robot\",",
+        "score": 78,
+        "why_matched": "matched token/symbol: write",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "workspace",
+        "repo": "workspace",
+        "path": "tmp/phase7.md",
+        "line_start": 5,
+        "line_end": 5,
+        "symbol": "an",
+        "snippet": "detects FINAL_STATUS markers, records a dossier result, and preserves the real",
+        "score": 50,
+        "why_matched": "matched token/symbol: an",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      }
+    ],
+    "summary": "Found 2 weighted match(es) across gatorbots",
+    "retrieval_summary": "Found 2 weighted match(es) across gatorbots",
+    "coverage_note": "Moderate coverage with 2 matches; verify implementation details against official APIs.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "source_receipts": [
+      {
+        "repo": "workspace",
+        "style_family": null,
+        "official_source": false,
+        "archived_source": false,
+        "freshness_days": 0,
+        "source_weight": 1,
+        "quality_score": 55,
+        "match_count": 2,
+        "top_score": 78,
+        "sample_path": "tmp/patternscout-cache/cache.json",
+        "evidence_receipts": [
+          "unregistered_repo"
+        ]
+      }
+    ],
+    "freshness_badge": "fresh_mixed",
+    "confidence": "medium",
+    "warnings": []
+  },
+  "45161b3c2226b2c7ea1dfe0bec1a4b9ce53b84bb": {
+    "ts": 1773024397607,
+    "normalized": {
+      "raw": "Write an intake subsystem with TalonFX and beam break",
+      "tokens": [
+        "write",
+        "an",
+        "intake",
+        "subsystem",
+        "with",
+        "talonfx",
+        "and",
+        "beam",
+        "break"
+      ],
+      "phrases": [],
+      "symbols": [
+        "Write",
+        "TalonFX"
+      ],
+      "vendorHints": [],
+      "subsystemHints": [
+        "intake",
+        "beam",
+        "break"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "workspace",
+        "repo": "workspace",
+        "path": "tmp/patternscout-cache/cache.json",
+        "line_start": 193,
+        "line_end": 193,
+        "symbol": "write",
+        "snippet": "\"raw\": \"Write a command-based intake subsystem for our FRC robot\",",
+        "score": 78,
+        "why_matched": "matched token/symbol: write",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "workspace",
+        "repo": "workspace",
+        "path": "tmp/phase7.md",
+        "line_start": 5,
+        "line_end": 5,
+        "symbol": "an",
+        "snippet": "detects FINAL_STATUS markers, records a dossier result, and preserves the real",
+        "score": 50,
+        "why_matched": "matched token/symbol: an",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      }
+    ],
+    "summary": "Found 2 weighted match(es) across gatorbots",
+    "retrieval_summary": "Found 2 weighted match(es) across gatorbots",
+    "coverage_note": "Moderate coverage with 2 matches; verify implementation details against official APIs.",
+    "source_tiers_used": [
+      "gatorbots"
+    ],
+    "source_receipts": [
+      {
+        "repo": "workspace",
+        "style_family": null,
+        "official_source": false,
+        "archived_source": false,
+        "freshness_days": 0,
+        "source_weight": 1,
+        "quality_score": 55,
+        "match_count": 2,
+        "top_score": 78,
+        "sample_path": "tmp/patternscout-cache/cache.json",
+        "evidence_receipts": [
+          "unregistered_repo"
+        ]
+      }
+    ],
+    "freshness_badge": "fresh_mixed",
+    "confidence": "medium",
+    "warnings": []
+  }
+}

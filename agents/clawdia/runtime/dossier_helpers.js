@@ -5,6 +5,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DEFAULT_RUNTIME_ROOT = path.resolve(__dirname, '..', '..', '..', 'runtime_state', 'dossiers', 'sessions');
+const OUTCOME_LABELS = new Set(['unknown', 'worked', 'partially_worked', 'failed', 'unsafe']);
+const OUTCOME_SOURCES = new Set(['system', 'manual', 'reaction', 'user_follow_up', 'follow_up_inference']);
 
 function nowIso(date) {
   return (date instanceof Date ? date : new Date()).toISOString();
@@ -39,6 +41,12 @@ function makeThreadKey(sessionId, rootRequestId) {
   return `thread_${sanitizeIdPart(sessionId, 'session')}_${sanitizeIdPart(rootRequestId, 'root')}`;
 }
 
+function normalizeConversationPart(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
 function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -48,6 +56,62 @@ function asText(value) {
   if (value == null) return '';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+function toFiniteNumber(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function durationMsFromIso(startIso, endIso) {
+  const start = Date.parse(String(startIso || ''));
+  const end = Date.parse(String(endIso || ''));
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  const delta = end - start;
+  return delta >= 0 ? delta : null;
+}
+
+function normalizeOutcomeLabel(label) {
+  const normalized = String(label || '').trim().toLowerCase();
+  return OUTCOME_LABELS.has(normalized) ? normalized : 'unknown';
+}
+
+function normalizeOutcomeSource(source) {
+  const normalized = String(source || '').trim().toLowerCase();
+  return OUTCOME_SOURCES.has(normalized) ? normalized : 'system';
+}
+
+function ensureSelfImprovementState(dossier) {
+  if (!dossier || typeof dossier !== 'object') return {};
+  dossier.self_improvement = dossier.self_improvement || {};
+  const state = dossier.self_improvement;
+
+  state.telemetry = state.telemetry || {};
+  state.telemetry.intent = String(state.telemetry.intent || dossier.intent || 'general_or_non_frc');
+  state.telemetry.route = String(state.telemetry.route || dossier.route || 'unclassified');
+  state.telemetry.execution_plan = asArray(state.telemetry.execution_plan).map((x) => String(x));
+  state.telemetry.status_markers = asArray(state.telemetry.status_markers).map((x) => String(x));
+  state.telemetry.total_elapsed_ms = toFiniteNumber(state.telemetry.total_elapsed_ms);
+  state.telemetry.worker_count = Number.isFinite(Number(state.telemetry.worker_count))
+    ? Number(state.telemetry.worker_count)
+    : 0;
+  state.telemetry.retrieval_source_count = Number.isFinite(Number(state.telemetry.retrieval_source_count))
+    ? Number(state.telemetry.retrieval_source_count)
+    : 0;
+  state.telemetry.answer_mode = String(state.telemetry.answer_mode || dossier.answer_mode || 'direct_answer');
+  state.telemetry.checker_status = state.telemetry.checker_status || null;
+
+  state.outcome = state.outcome || {};
+  state.outcome.label = normalizeOutcomeLabel(state.outcome.label || 'unknown');
+  state.outcome.source = normalizeOutcomeSource(state.outcome.source || 'system');
+  state.outcome.note = state.outcome.note == null ? null : String(state.outcome.note).slice(0, 300);
+  state.outcome.recorded_at = state.outcome.recorded_at || null;
+
+  if (state.quality_evaluation != null && typeof state.quality_evaluation !== 'object') {
+    state.quality_evaluation = null;
+  }
+
+  return state;
 }
 
 function ensureSessionDirs(sessionId, options) {
@@ -77,6 +141,72 @@ function loadRequestDossier(sessionId, requestId, options) {
   if (!sessionId || !requestId) return null;
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
   return readJsonIfExists(path.join(runtimeRoot, sessionId, 'requests', `${requestId}.json`));
+}
+
+function isSameConversation(dossier, chatId, threadOrTopicId) {
+  if (!dossier || chatId == null) return false;
+
+  const dossierChat = normalizeConversationPart(dossier.chat_id);
+  const dossierThread = normalizeConversationPart(dossier.thread_or_topic_id);
+  const targetChat = normalizeConversationPart(chatId);
+  const targetThread = normalizeConversationPart(threadOrTopicId);
+
+  if (!targetChat || dossierChat !== targetChat) {
+    return false;
+  }
+
+  if (targetThread == null) {
+    return dossierThread == null;
+  }
+
+  return dossierThread === targetThread;
+}
+
+function loadLatestDossierForConversation(chatId, threadOrTopicId, options) {
+  const targetChat = normalizeConversationPart(chatId);
+  if (!targetChat) return null;
+
+  const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
+  if (!fs.existsSync(runtimeRoot)) return null;
+
+  const maxAgeMs = Number(options?.maxAgeMs);
+  const hasAgeLimit = Number.isFinite(maxAgeMs) && maxAgeMs > 0;
+
+  let latest = null;
+  let latestTs = Number.NEGATIVE_INFINITY;
+
+  const sessions = fs.readdirSync(runtimeRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  for (const sessionName of sessions) {
+    const candidate = readJsonIfExists(path.join(runtimeRoot, sessionName, 'latest.json'));
+    if (!candidate || !isSameConversation(candidate, targetChat, threadOrTopicId)) {
+      continue;
+    }
+
+    const ts = Date.parse(String(
+      candidate?.timestamps?.updated_at ||
+      candidate?.timestamps?.created_at ||
+      ''
+    ));
+    const sortableTs = Number.isFinite(ts) ? ts : 0;
+    if (sortableTs > latestTs) {
+      latest = candidate;
+      latestTs = sortableTs;
+    }
+  }
+
+  if (!latest) return null;
+
+  if (hasAgeLimit && Number.isFinite(latestTs)) {
+    const age = Date.now() - latestTs;
+    if (age > maxAgeMs) {
+      return null;
+    }
+  }
+
+  return latest;
 }
 
 function looksLikeFollowUp(userMessage, conversationContext) {
@@ -157,6 +287,26 @@ function createInitialDossier(options) {
       assumptions: [],
       notes: []
     },
+    self_improvement: {
+      telemetry: {
+        intent: opts.intent || 'general_or_non_frc',
+        route: opts.route || 'unclassified',
+        execution_plan: [],
+        status_markers: [],
+        total_elapsed_ms: null,
+        worker_count: 0,
+        retrieval_source_count: 0,
+        answer_mode: 'direct_answer',
+        checker_status: null
+      },
+      quality_evaluation: null,
+      outcome: {
+        label: 'unknown',
+        source: 'system',
+        note: null,
+        recorded_at: null
+      }
+    },
     human_dossier_note: '',
     timestamps: {
       created_at: createdAt,
@@ -185,6 +335,17 @@ function noteHumanEvent(dossier, label, status) {
   dossier.context = dossier.context || {};
   dossier.context.notes = asArray(dossier.context.notes);
   dossier.context.notes.push(`${label || 'event'}: ${status || 'unknown'}`);
+  dossier.timestamps = dossier.timestamps || {};
+  dossier.timestamps.updated_at = nowIso();
+  return dossier;
+}
+
+function setExecutionPlanTelemetry(dossier, executionPlan) {
+  if (!dossier) return dossier;
+  const state = ensureSelfImprovementState(dossier);
+  state.telemetry.execution_plan = asArray(executionPlan).map((x) => String(x)).slice(0, 32);
+  state.telemetry.intent = String(dossier.intent || state.telemetry.intent || 'general_or_non_frc');
+  state.telemetry.route = String(dossier.route || state.telemetry.route || 'unclassified');
   dossier.timestamps = dossier.timestamps || {};
   dossier.timestamps.updated_at = nowIso();
   return dossier;
@@ -268,6 +429,10 @@ function recordWorkerOutput(dossier, worker, result) {
     markEscalated(dossier, worker);
   }
 
+  if (worker === 'coach_evaluator') {
+    applyQualityEvaluation(dossier, normalizedResult);
+  }
+
   dossier.timestamps = dossier.timestamps || {};
   dossier.timestamps.updated_at = nowIso();
   return dossier;
@@ -345,6 +510,90 @@ function resolveAnswerMode(dossier) {
   return 'direct_answer';
 }
 
+function finalizeSelfImprovementTelemetry(dossier, options) {
+  if (!dossier) return dossier;
+  const opts = options || {};
+  const state = ensureSelfImprovementState(dossier);
+  const stageTimes = dossier.elapsed_time_ms_by_stage || {};
+  const totalStageMs = Object.values(stageTimes).reduce((sum, value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n >= 0 ? sum + n : sum;
+  }, 0);
+
+  const fromTimestamps = durationMsFromIso(dossier?.timestamps?.created_at, dossier?.timestamps?.updated_at);
+  state.telemetry.total_elapsed_ms = totalStageMs > 0 ? totalStageMs : fromTimestamps;
+  state.telemetry.worker_count = asArray(dossier.worker_trace).length;
+  state.telemetry.retrieval_source_count = asArray(dossier.retrieval_sources).length;
+  state.telemetry.answer_mode = String(dossier.answer_mode || resolveAnswerMode(dossier));
+  state.telemetry.intent = String(dossier.intent || state.telemetry.intent || 'general_or_non_frc');
+  state.telemetry.route = String(dossier.route || state.telemetry.route || 'unclassified');
+  state.telemetry.status_markers = asArray(opts.statusMarkers || state.telemetry.status_markers).map((x) => String(x));
+
+  const checkerOverall = dossier?.worker_outputs?.checker?.overall_status;
+  state.telemetry.checker_status = checkerOverall ? String(checkerOverall) : state.telemetry.checker_status || null;
+
+  return dossier;
+}
+
+function applyQualityEvaluation(dossier, evaluation) {
+  if (!dossier || !evaluation || typeof evaluation !== 'object') return dossier;
+  const state = ensureSelfImprovementState(dossier);
+
+  const incomingScores = evaluation.scores && typeof evaluation.scores === 'object'
+    ? evaluation.scores
+    : {};
+
+  const safeScore = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    if (n < 0) return 0;
+    if (n > 100) return 100;
+    return Math.round(n);
+  };
+
+  const overall = safeScore(evaluation.overall_score ?? incomingScores.overall);
+  state.quality_evaluation = {
+    worker: 'coach_evaluator',
+    at: nowIso(),
+    summary: asText(evaluation.summary || '').slice(0, 400),
+    confidence: evaluation.confidence ? String(evaluation.confidence) : null,
+    scores: {
+      overall,
+      correctness: safeScore(incomingScores.correctness),
+      safety: safeScore(incomingScores.safety),
+      teaching: safeScore(incomingScores.teaching),
+      evidence: safeScore(incomingScores.evidence)
+    },
+    flags: asArray(evaluation.flags).map((x) => String(x)).slice(0, 24),
+    recommendations: asArray(evaluation.recommendations).map((x) => String(x)).slice(0, 24),
+    metrics: evaluation.metrics && typeof evaluation.metrics === 'object'
+      ? evaluation.metrics
+      : {}
+  };
+
+  dossier.timestamps = dossier.timestamps || {};
+  dossier.timestamps.updated_at = nowIso();
+  return dossier;
+}
+
+function setOutcomeLabel(dossier, label, options) {
+  if (!dossier) return dossier;
+  const opts = options || {};
+  const state = ensureSelfImprovementState(dossier);
+  const normalizedLabel = normalizeOutcomeLabel(label);
+  const normalizedSource = normalizeOutcomeSource(opts.source);
+
+  state.outcome = {
+    label: normalizedLabel,
+    source: normalizedSource,
+    note: opts.note == null ? null : String(opts.note).slice(0, 300),
+    recorded_at: nowIso()
+  };
+
+  noteHumanEvent(dossier, 'outcome', `${normalizedLabel} via ${normalizedSource}`);
+  return dossier;
+}
+
 function finalizeDossier(dossier) {
   if (!dossier) return dossier;
   dossier.answer_mode = resolveAnswerMode(dossier);
@@ -356,6 +605,7 @@ function finalizeDossier(dossier) {
   dossier.stage_status = dossier.stage_status || {};
   dossier.stage_status.finalize = 'completed';
 
+  finalizeSelfImprovementTelemetry(dossier);
   dossier.human_dossier_note = renderHumanDossierNote(dossier);
   dossier.timestamps = dossier.timestamps || {};
   dossier.timestamps.updated_at = nowIso();
@@ -380,14 +630,49 @@ function renderHumanDossierNote(dossier) {
     keyState.push(`guarded=${d.review_state.guarded_reason || 'unknown'}`);
   }
 
+  const qualityOverall = d.self_improvement?.quality_evaluation?.scores?.overall;
+  const qualityText = qualityOverall == null ? 'n/a' : String(qualityOverall);
+  const outcomeLabel = d.self_improvement?.outcome?.label || 'unknown';
+  const outcomeSource = d.self_improvement?.outcome?.source || 'system';
+
   return [
     `# Request ${d.request_id || 'unknown'}`,
     `- intent: ${d.intent || 'unknown'}`,
     `- parent: ${d.parent_request_id || 'none'}`,
     `- workers: ${workers.join(', ') || 'none'}`,
     `- answer mode: ${d.answer_mode || resolveAnswerMode(d)}`,
-    `- state: ${keyState.join('; ') || 'none'}`
+    `- state: ${keyState.join('; ') || 'none'}`,
+    `- quality overall: ${qualityText}`,
+    `- outcome: ${outcomeLabel} (${outcomeSource})`
   ].join('\n');
+}
+
+function findRequestJsonPath(requestId, runtimeRoot) {
+  const root = runtimeRoot || DEFAULT_RUNTIME_ROOT;
+  if (!requestId || !fs.existsSync(root)) return null;
+
+  const sessions = fs.readdirSync(root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  for (const sessionName of sessions) {
+    const jsonPath = path.join(root, sessionName, 'requests', `${requestId}.json`);
+    if (fs.existsSync(jsonPath)) {
+      return {
+        sessionId: sessionName,
+        path: jsonPath
+      };
+    }
+  }
+
+  return null;
+}
+
+function loadRequestDossierById(requestId, options) {
+  const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
+  const located = findRequestJsonPath(requestId, runtimeRoot);
+  if (!located) return null;
+  return readJsonIfExists(located.path);
 }
 
 function findRequestMarkdownPath(requestId, runtimeRoot) {
@@ -438,6 +723,8 @@ function saveDossier(dossier, options) {
   const { sessionDir, requestsDir } = ensureSessionDirs(dossier.session_id, { runtimeRoot });
 
   dossier.answer_mode = resolveAnswerMode(dossier);
+  ensureSelfImprovementState(dossier);
+  finalizeSelfImprovementTelemetry(dossier);
   dossier.timestamps = dossier.timestamps || {};
   if (!dossier.timestamps.created_at) dossier.timestamps.created_at = nowIso();
   dossier.timestamps.updated_at = nowIso();
@@ -457,28 +744,67 @@ function saveDossier(dossier, options) {
   return dossier;
 }
 
+function updateOutcomeLabel(requestId, label, options) {
+  const opts = options || {};
+  const runtimeRoot = opts.runtimeRoot || DEFAULT_RUNTIME_ROOT;
+  let sessionId = opts.sessionId || null;
+  let dossier = null;
+
+  if (sessionId) {
+    dossier = loadRequestDossier(sessionId, requestId, { runtimeRoot });
+  }
+
+  if (!dossier) {
+    const located = findRequestJsonPath(requestId, runtimeRoot);
+    if (!located) return null;
+    sessionId = located.sessionId;
+    dossier = readJsonIfExists(located.path);
+  }
+
+  if (!dossier) return null;
+
+  setOutcomeLabel(dossier, label, {
+    source: opts.source,
+    note: opts.note
+  });
+
+  saveDossier(dossier, { runtimeRoot });
+  return dossier;
+}
+
 module.exports = {
   DEFAULT_RUNTIME_ROOT,
+  OUTCOME_LABELS,
+  OUTCOME_SOURCES,
   asArray,
   asText,
   makeRequestId,
   makeSessionId,
   makeThreadKey,
+  ensureSelfImprovementState,
   createInitialDossier,
   noteStageStatus,
   noteHumanEvent,
+  setExecutionPlanTelemetry,
   mergeTelemetry,
   recordWorkerOutput,
   attachParentDossier,
   markGuarded,
   markReviewCompleted,
   markEscalated,
+  applyQualityEvaluation,
+  setOutcomeLabel,
+  updateOutcomeLabel,
   resolveAnswerMode,
+  finalizeSelfImprovementTelemetry,
   finalizeDossier,
   renderHumanDossierNote,
   saveDossier,
   loadLatestDossier,
   loadRequestDossier,
+  loadRequestDossierById,
+  loadLatestDossierForConversation,
   writeHumanDossierNote,
-  looksLikeFollowUp
+  looksLikeFollowUp,
+  isSameConversation
 };

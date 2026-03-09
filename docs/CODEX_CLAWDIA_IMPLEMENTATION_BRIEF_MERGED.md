@@ -135,7 +135,7 @@ Exact paths may be adapted to existing repo conventions, but keep the semantics.
 - `docs/ops/provider-failover-map.md`
 - `docs/ops/outage-playbook.md`
 - `docs/ops/telemetry-format.md`
-- `docs/runtime/openclaw.template.json`
+- `~/.openclaw/openclaw.json`
 
 ### 4.2 Runtime core
 - `agents/clawdia/runtime/dossier_helpers.js`
@@ -459,7 +459,7 @@ Create or update:
 - provider failover map
 - outage playbook
 - telemetry format doc
-- `openclaw.template.json`
+- `~/.openclaw/openclaw.json`
 
 ### 12.1 Config template requirements
 Document:

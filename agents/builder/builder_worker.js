@@ -51,12 +51,27 @@ function gatherContext(payload) {
   const dossierOutputs = payload?.dossier?.worker_outputs || {};
   const librarianOut = dossierOutputs.librarian || {};
   const patternscoutOut = dossierOutputs.patternscout || {};
+  const matches = Array.isArray(patternscoutOut.matches) ? patternscoutOut.matches : [];
+  const sourceReceipts = Array.isArray(patternscoutOut.source_receipts) ? patternscoutOut.source_receipts : [];
+
+  const styleCounts = new Map();
+  for (const match of matches) {
+    const style = match?.style_family ? String(match.style_family) : null;
+    if (!style) continue;
+    styleCounts.set(style, (styleCounts.get(style) || 0) + 1);
+  }
+
+  const style_profile = Array.from(styleCounts.entries())
+    .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
   return {
     facts: Array.isArray(librarianOut.facts) ? librarianOut.facts : [],
     key_apis: Array.isArray(librarianOut.key_apis) ? librarianOut.key_apis : [],
     sources: Array.isArray(librarianOut.sources) ? librarianOut.sources : [],
-    matches: Array.isArray(patternscoutOut.matches) ? patternscoutOut.matches : [],
+    matches,
+    source_receipts: sourceReceipts,
+    freshness_badge: patternscoutOut.freshness_badge || null,
+    style_profile,
     retrieval_sources: retrieval
   };
 }
@@ -71,6 +86,23 @@ function buildExplanation(intent, userMessage, context) {
 
   if (context.key_apis.length > 0) {
     parts.push(`\nRelevant APIs:\n${context.key_apis.slice(0, 5).map((a) => `- ${a}`).join('\n')}`);
+  }
+
+  if (context.style_profile) {
+    parts.push(`\nInferred architecture style: ${context.style_profile}`);
+  }
+
+  if (context.freshness_badge) {
+    parts.push(`\nRetrieval freshness: ${context.freshness_badge}`);
+  }
+
+  if (Array.isArray(context.source_receipts) && context.source_receipts.length > 0) {
+    const evidenceLines = context.source_receipts.slice(0, 3).map((receipt) => {
+      const repo = receipt.repo || 'unknown';
+      const sample = receipt.sample_path || 'n/a';
+      return `- ${repo} (${sample})`;
+    });
+    parts.push(`\nEvidence receipts:\n${evidenceLines.join('\n')}`);
   }
 
   parts.push('\n**Note:** This code is a draft and has NOT been reviewed. Do not deploy without Arbiter review.');
