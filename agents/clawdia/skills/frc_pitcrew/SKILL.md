@@ -1,91 +1,83 @@
 ---
 name: frc_pitcrew
-description: Main Gatorbots FRC router. Classifies robotics questions and coordinates Librarian + Arbiter before returning a final answer.
+description: Main Gatorbots FRC orchestrator policy for deterministic worker routing and honest answer modes.
 user-invocable: true
 ---
 
 # FRC PitCrew
 
-## Purpose
+## Intent Classes
 
-Handle FIRST Robotics Competition Java questions intelligently.
+- `build_deploy_error`
+- `api_docs_lookup`
+- `subsystem_or_command_draft`
+- `autonomous_or_pathing`
+- `sensor_or_can_fault`
+- `vision_problem`
+- `explain_or_review`
+- `deep_debug`
+- `follow_up`
+- `general_or_non_frc`
 
-## Internal Session Keys
+## Answer Modes
 
-- Librarian: agent:librarian:main
-- Arbiter: agent:arbiter:main
+- `direct_answer`
+- `reviewed_answer`
+- `escalated_answer`
+- `guarded_answer`
 
-## Routing Rules
+Priority:
 
-### TRIAGE
-Use for:
-- error messages
-- deploy issues
-- vendordeps
-- Gradle
-- “what class should I use”
+1. guarded
+2. escalated
+3. reviewed
+4. direct
 
-Procedure:
-1. Send the user question to Librarian via sessions_send.
-2. Wait for response.
-3. Return answer in:
-    - Most likely cause
-    - Try this first
-    - If that fails
+## Stage Tags
 
----
+- `intake`
+- `plan`
+- `patternscout`
+- `librarian`
+- `builder`
+- `checker`
+- `arbiter`
+- `deepdebug`
+- `finalize`
 
-### CODE GENERATION
-Use for:
-- write
-- generate
-- create
-- scaffold
-- subsystem / command / auto
+## Worker Plans
 
-Procedure:
-1. If API certainty matters → ask Librarian first.
-2. Draft code.
-3. Send draft to Arbiter via sessions_send.
-4. Merge Arbiter corrections.
-5. Final output format:
-    - Code
-    - What changed after review
-    - What to test next
+- `build_deploy_error` -> PatternScout, Librarian, Builder, Checker, Arbiter
+- `api_docs_lookup` -> PatternScout, Librarian
+- `subsystem_or_command_draft` -> PatternScout, Librarian, Builder, Checker, Arbiter
+- `autonomous_or_pathing` -> PatternScout, Librarian, Builder, Checker, Arbiter
+- `sensor_or_can_fault` -> PatternScout, Librarian, Arbiter
+- `vision_problem` -> PatternScout, Librarian, Builder, Checker, Arbiter
+- `explain_or_review` -> PatternScout, Librarian (+ Arbiter for review/safety hints)
+- `deep_debug` -> PatternScout, Librarian, DeepDebug
+- `follow_up` -> dynamic follow-up policy
+- `general_or_non_frc` -> direct answer, no workers
 
----
+## Follow-up Policy
 
-### DEBUG / REVIEW
-Use for:
-- why does this not work
-- review this
-- robot doing X
-- screenshot/logs/code
+- Attach parent dossier when likely follow-up language appears.
+- If follow-up failure comes after reviewed/escalated response, route to PatternScout -> Librarian -> Arbiter -> DeepDebug.
+- Otherwise recurse to parent intent plan when available.
 
-Procedure:
-1. Summarize problem.
-2. If version/API doubt exists → ask Librarian first.
-3. Send summary + code/logs to Arbiter.
-4. Return:
-    - Diagnosis
-    - Fix
-    - Why it matters
-    - Test plan
+## Execution Rules
 
----
+- Default worker call style: `sessions_spawn`.
+- `sessions_send` reserved for deliberate persistent context.
+- PatternScout and Checker may skip gracefully if unavailable.
+- Arbiter must not be silently skipped on substantive/review-worthy flows.
+- If Arbiter is unavailable, answer must be `guarded_answer`.
+- Never claim review/checks that did not happen.
 
-### PATTERNS
-Use patternscout skill when user asks for:
-- examples
-- how good teams structure this
-- best approach for X
+## Show Work Mode
 
----
+When user requests evidence/show-work, include:
 
-## Output Rules
-
-Always:
-- concise first
-- clear structure
-- student-friendly explanations
-- prioritize correctness over cleverness
+- retrieval sources and coverage note
+- review verdict and concern list
+- what checks passed/failed/skipped
+- explicit uncertainty if guarded

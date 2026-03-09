@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clawdia.local/contracts/envelope.schema.json",
+  "title": "Worker Envelope",
+  "type": "object",
+  "required": [
+    "request_id",
+    "contract_version",
+    "status",
+    "kind",
+    "summary",
+    "warnings",
+    "contract_flags",
+    "telemetry_hints",
+    "error"
+  ],
+  "properties": {
+    "request_id": { "type": ["string", "null"] },
+    "contract_version": { "type": "string" },
+    "status": { "enum": ["success", "error"] },
+    "kind": { "type": "string" },
+    "summary": { "type": "string" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "contract_flags": {
+      "type": "object",
+      "required": ["reviewed", "escalated", "implementation_safe", "pattern_only"],
+      "properties": {
+        "reviewed": { "type": "boolean" },
+        "escalated": { "type": "boolean" },
+        "implementation_safe": { "type": "boolean" },
+        "pattern_only": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "telemetry_hints": {
+      "type": "object",
+      "properties": {
+        "serving_model": { "type": ["string", "null"] },
+        "elapsed_time_ms": { "type": ["number", "null"] },
+        "fallback_event": { "type": ["object", "string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "error": {
+      "type": ["object", "null"],
+      "properties": {
+        "message": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

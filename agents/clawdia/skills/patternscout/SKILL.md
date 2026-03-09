@@ -1,85 +1,32 @@
 ---
 name: patternscout
-description: Mine high-signal FRC/WPILib Java patterns using GitHub CLI search and curated filtering.
+description: Hybrid retrieval front door for FRC patterns: local team sources, curated docs, official examples, then remote fallback.
 user-invocable: true
-metadata: {"openclaw":{"requires":{"bins":["gh"]}}}
+metadata: {"openclaw":{"requires":{"bins":["rg","gh"]}}}
 ---
 
-# PatternScout (GitHub CLI Powered)
+# PatternScout
 
-## Purpose
+## Retrieval Order
 
-Find strong FRC/WPILib Java patterns from real GitHub repos and explain how to apply them.
+1. Local team sources and repo mirrors
+2. Curated local docs memory
+3. Official/approved examples
+4. Remote GitHub fallback (cached)
 
-This is NOT random web search.
-This uses GitHub code search via `gh`.
-
----
-
-## When To Use
-
-Use for:
-- "Show me a clean swerve subsystem pattern"
-- "How do good teams structure autos?"
-- "Find examples of SwerveDrivePoseEstimator usage"
-- "What’s a clean command-based intake structure?"
-
----
-
-## Search Strategy
-
-1. Identify key search phrase.
-    Examples:
-    - SwerveDrivePoseEstimator
-    - SubsystemBase
-    - PathPlanner AutoBuilder
-    - TalonFXConfiguration
-    - CommandScheduler
-
-2. Run targeted GitHub searches:
-
-    Code search:
-    gh search code "<SEARCH_TERM>" --language Java --limit 20
-
-    Repo search:
-    gh search repos "topic:frc language:java" --limit 20
-
-3. Prefer:
-    - Official WPILib examples
-    - Vendor example repos
-    - Well-known team repos
-    - Repos with meaningful stars
-
-4. Avoid:
-    - Tiny or clearly unfinished repos
-    - Repos with only 1–2 commits
-
----
-
-## Output Format
+## Output Contract
 
 Return:
 
-### 1️⃣ Best Fit Pattern
-- Repo link
-- File path
-- Why it's strong
+- `matches`
+- `retrieval_summary`
+- `coverage_note`
+- `retrieval_latency_ms`
+- `source_tiers_used`
+- `confidence`
 
-### 2️⃣ Alternative Pattern
-- Repo link
-- Tradeoffs
+## Rules
 
-### 3️⃣ Recommendation
-- Which one to use
-- Why
-- One pitfall to avoid
-
-Keep it concise.
-
----
-
-## Tone
-
-- Engineering mentor energy
-- Practical
-- No fluff
+- Prefer team and official sources before random public snippets.
+- If retrieval is sparse, say so explicitly in coverage/confidence.
+- Cache remote fallback queries with a 24h TTL.
