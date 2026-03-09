@@ -144,12 +144,11 @@ Patch the active runtime entrypoint and supporting files as needed, likely under
 - `docs/runtime/openclaw.template.json`
 
 ### 4.4 Tests and fixtures
-Recommended paths if no equivalent already exists:
+Current repository state:
 
-- `scripts/tests/phase2/phase2-patternscout-checker-test-runner.js`
-- `scripts/tests/phase2/fixtures/docs-memory/...`
-- `scripts/tests/phase2/fixtures/repo-mirror/...`
-- `scripts/tests/phase2/fixtures/checker-repo/...`
+- Legacy `scripts/tests/*` and `tests/*` harness paths were removed during cleanup.
+- Validation is run via direct runtime smoke checks against `agents/clawdia/runtime/helpdesk_orchestrator.js`.
+- Temporary fixtures can be created under `tmp/` when needed, but should not be treated as permanent test harness paths.
 
 ---
 
@@ -713,14 +712,11 @@ Add at least these integration/smoke tests:
    - expect parent linkage intact
 
 ### 10.4 Validation runner
-Create a single executable test entry, for example:
+Current repository state:
 
-- `scripts/tests/phase2/phase2-patternscout-checker-test-runner.js`
-
-This runner should:
-- execute the Phase 2 tests
-- print per-test pass/fail lines
-- exit nonzero on failure
+- No dedicated `scripts/tests` runner is retained.
+- Use direct smoke checks that invoke the runtime entrypoint and verify dossier + trace behavior.
+- Keep command output machine-parseable and exit nonzero on failure.
 
 ---
 
@@ -873,7 +869,7 @@ Part 2 is done only when all of these are true:
 2. `checker` is called through the live runtime and performs real worktree-based validation when given a safe builder payload
 3. both workers degrade gracefully on missing config or tool outages
 4. existing Phase 1 answer-mode and dossier behavior still pass
-5. Phase 2 tests pass
+5. current runtime smoke validations pass
 6. no duplicate path/casing mistakes were introduced
 7. no user-controlled shell execution exists in the new code
 
@@ -881,14 +877,15 @@ Part 2 is done only when all of these are true:
 
 ## 14. Validation commands Codex must run
 
-Use the repo’s real package/test commands if they already exist. At minimum, run:
+Use the repo’s real package/test commands if they already exist. In this cleaned repo, run at minimum:
 
 ```bash
-node scripts/tests/phase1/phase1-test-runner.js
-node scripts/tests/phase2/phase2-patternscout-checker-test-runner.js
+node -e "require('./agents/clawdia/runtime/helpdesk_orchestrator')"
+bash -n scripts/codex-plan.sh
+bash -n scripts/codex-implement.sh
 ```
 
-If the repo already has a higher-level test command, run it too.
+If the repo later restores a higher-level test command, run it too.
 
 Also run lightweight syntax checks on any new Node files if the repo does not already do that:
 
@@ -934,8 +931,9 @@ Format example:
 - allowlisted profiles: ...
 
 ## Validation
-- `node scripts/tests/phase1/phase1-test-runner.js` ✅
-- `node scripts/tests/phase2/phase2-patternscout-checker-test-runner.js` ✅
+- `node -e "require('./agents/clawdia/runtime/helpdesk_orchestrator')"` ✅
+- `bash -n scripts/codex-plan.sh` ✅
+- `bash -n scripts/codex-implement.sh` ✅
 
 ## Deferred
 - ...
