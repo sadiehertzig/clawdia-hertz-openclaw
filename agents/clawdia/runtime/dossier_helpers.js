@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DEFAULT_RUNTIME_ROOT = path.resolve(__dirname, '..', '..', '..', 'runtime_state', 'dossiers', 'sessions');
+const DOSSIER_SCHEMA_VERSION = 2;
 const OUTCOME_LABELS = new Set(['unknown', 'worked', 'partially_worked', 'failed', 'unsafe']);
 const OUTCOME_SOURCES = new Set(['system', 'manual', 'reaction', 'user_follow_up', 'follow_up_inference']);
 
@@ -122,10 +123,47 @@ function ensureSessionDirs(sessionId, options) {
   return { sessionDir, requestsDir };
 }
 
+function writeFileAtomic(filePath, content, encoding) {
+  const dir = path.dirname(filePath);
+  const base = path.basename(filePath);
+  const tmpPath = path.join(dir, `.${base}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tmpPath, content, encoding || 'utf8');
+  fs.renameSync(tmpPath, filePath);
+}
+
+function normalizeDossierShape(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const dossier = raw;
+  const schemaVersion = Number(dossier.schema_version);
+  dossier.schema_version = Number.isFinite(schemaVersion) && schemaVersion > 0
+    ? Math.floor(schemaVersion)
+    : 1;
+
+  if (!dossier.root_request_id) {
+    if (dossier.parent_request_id) dossier.root_request_id = dossier.parent_request_id;
+    else dossier.root_request_id = dossier.request_id || null;
+  }
+
+  if (!dossier.thread_key && dossier.session_id && dossier.root_request_id) {
+    dossier.thread_key = makeThreadKey(dossier.session_id, dossier.root_request_id);
+  }
+
+  if (!dossier.timestamps || typeof dossier.timestamps !== 'object') {
+    dossier.timestamps = {
+      created_at: nowIso(),
+      updated_at: nowIso()
+    };
+  }
+
+  ensureSelfImprovementState(dossier);
+  return dossier;
+}
+
 function readJsonIfExists(filePath) {
   if (!fs.existsSync(filePath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return normalizeDossierShape(parsed);
   } catch {
     return null;
   }
@@ -242,16 +280,18 @@ function createInitialDossier(options) {
   const parent = opts.parentDossier || null;
   const inferredFollowUp = parent && looksLikeFollowUp(opts.userMessage, opts.conversationContext);
   const parentRequestId = parent ? parent.request_id || null : null;
-  const rootRequestId = parent && parent.thread_key
-    ? String(parent.thread_key).split('_').slice(-2).join('_')
+  const rootRequestId = parent
+    ? (parent.root_request_id || parent.request_id || requestId)
     : requestId;
 
   const retryBase = Number(parent?.context?.retry_count || 0);
   const retryCount = inferredFollowUp ? retryBase + 1 : 0;
 
   const dossier = {
+    schema_version: DOSSIER_SCHEMA_VERSION,
     request_id: requestId,
     parent_request_id: parentRequestId,
+    root_request_id: rootRequestId,
     chat_id: opts.chatId || opts.peerId || null,
     thread_or_topic_id: opts.threadOrTopicId || null,
     session_id: sessionId,
@@ -443,6 +483,7 @@ function attachParentDossier(dossier, parentDossier, options) {
 
   const opts = options || {};
   dossier.parent_request_id = parentDossier.request_id || dossier.parent_request_id;
+  dossier.root_request_id = parentDossier.root_request_id || parentDossier.request_id || dossier.root_request_id;
   dossier.context = dossier.context || {};
   dossier.context.parent_intent = parentDossier.intent || dossier.context.parent_intent || null;
 
@@ -706,7 +747,7 @@ function writeHumanDossierNote(requestId, note, options) {
 
   if (!requestNotePath) return false;
 
-  fs.writeFileSync(requestNotePath, String(note || ''), 'utf8');
+  writeFileAtomic(requestNotePath, String(note || ''), 'utf8');
   return true;
 }
 
@@ -722,6 +763,8 @@ function saveDossier(dossier, options) {
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
   const { sessionDir, requestsDir } = ensureSessionDirs(dossier.session_id, { runtimeRoot });
 
+  dossier.schema_version = DOSSIER_SCHEMA_VERSION;
+  if (!dossier.root_request_id) dossier.root_request_id = dossier.parent_request_id || dossier.request_id;
   dossier.answer_mode = resolveAnswerMode(dossier);
   ensureSelfImprovementState(dossier);
   finalizeSelfImprovementTelemetry(dossier);
@@ -736,10 +779,10 @@ function saveDossier(dossier, options) {
   const json = JSON.stringify(dossier, null, 2);
   const note = String(dossier.human_dossier_note || renderHumanDossierNote(dossier));
 
-  fs.writeFileSync(path.join(requestsDir, `${dossier.request_id}.json`), json, 'utf8');
-  fs.writeFileSync(path.join(requestsDir, `${dossier.request_id}.md`), note, 'utf8');
-  fs.writeFileSync(path.join(sessionDir, 'latest.json'), json, 'utf8');
-  fs.writeFileSync(path.join(sessionDir, 'latest.md'), note, 'utf8');
+  writeFileAtomic(path.join(requestsDir, `${dossier.request_id}.json`), json, 'utf8');
+  writeFileAtomic(path.join(requestsDir, `${dossier.request_id}.md`), note, 'utf8');
+  writeFileAtomic(path.join(sessionDir, 'latest.json'), json, 'utf8');
+  writeFileAtomic(path.join(sessionDir, 'latest.md'), note, 'utf8');
 
   return dossier;
 }
@@ -774,6 +817,7 @@ function updateOutcomeLabel(requestId, label, options) {
 
 module.exports = {
   DEFAULT_RUNTIME_ROOT,
+  DOSSIER_SCHEMA_VERSION,
   OUTCOME_LABELS,
   OUTCOME_SOURCES,
   asArray,

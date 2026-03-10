@@ -87,6 +87,8 @@ function run() {
 
   assert.equal(Array.isArray(substantive.execution_plan), true);
   assert.equal(substantive.execution_plan.includes('coach_evaluator'), true);
+  assert.equal(Number.isFinite(Number(substantive.dossier.schema_version)), true);
+  assert.equal(substantive.dossier.root_request_id, substantive.dossier.request_id);
   assert.equal(Array.isArray(substantive.dossier.worker_trace), true);
   assert.equal(substantive.dossier.worker_trace.some((x) => x.worker === 'coach_evaluator'), true);
   assert.equal(typeof substantive.dossier.worker_outputs.coach_evaluator, 'object');
@@ -150,6 +152,8 @@ function run() {
   });
 
   assert.equal(child.intent, 'follow_up');
+  assert.equal(child.dossier.parent_request_id, parent.dossier.request_id);
+  assert.equal(child.dossier.root_request_id, parent.dossier.root_request_id);
   const reloadedParent = runtime.loadRequestDossier(parent.dossier.session_id, parent.dossier.request_id, { runtimeRoot });
   assert.equal(reloadedParent?.self_improvement?.outcome?.label, 'failed');
   assert.equal(reloadedParent?.self_improvement?.outcome?.source, 'follow_up_inference');
