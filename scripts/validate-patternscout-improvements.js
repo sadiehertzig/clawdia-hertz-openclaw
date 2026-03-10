@@ -267,8 +267,27 @@ function testLearningArtifactsGeneration() {
     }
   };
 
+  const dossierNoisyFollowUp = {
+    request_id: 'req_noisy_followup',
+    intent: 'follow_up',
+    user_message: "that didn't work, still failing",
+    timestamps: { created_at: now, updated_at: now },
+    self_improvement: {
+      outcome: { label: 'worked', source: 'manual', recorded_at: now },
+      quality_evaluation: { scores: { overall: 95 } }
+    },
+    worker_outputs: {
+      patternscout: {
+        matches: [
+          { repo: 'noisy/followup-repo', path: 'src/Noisy.java', score: 92, snippet: 'still failing after trying that fix' }
+        ]
+      }
+    }
+  };
+
   seedRuntimeDossier(runtimeRoot, 'sess_one', 'req_worked', dossierWorked);
   seedRuntimeDossier(runtimeRoot, 'sess_two', 'req_failed', dossierFailed);
+  seedRuntimeDossier(runtimeRoot, 'sess_three', 'req_noisy_followup', dossierNoisyFollowUp);
 
   const learned = learnPatternScoutWeights({
     runtimeRoot,
@@ -281,8 +300,10 @@ function testLearningArtifactsGeneration() {
   const weights = loadDynamicWeights({ dynamicWeightsPath: weightsPath });
   const strong = weights.map.get('mechanical-advantage/robotcode2026public');
   const weak = weights.map.get('random/unknown-repo');
+  const noisy = weights.map.get('noisy/followup-repo');
   assert.equal(Boolean(strong), true);
   assert.equal(Boolean(weak), true);
+  assert.equal(Boolean(noisy), false);
   assert.equal(strong.weight > weak.weight, true);
 
   const cards = buildPatternCards({
@@ -297,6 +318,7 @@ function testLearningArtifactsGeneration() {
   const loadedCards = loadPatternCards({ patternCardsPath: cardsPath });
   assert.equal(Array.isArray(loadedCards.cards), true);
   assert.equal(loadedCards.cards.length >= 1, true);
+  assert.equal(loadedCards.cards.some((c) => String(c.source_repo || '').toLowerCase() === 'noisy/followup-repo'), false);
 
   console.log('ok - learning artifacts from outcomes (weights + cards)');
 }

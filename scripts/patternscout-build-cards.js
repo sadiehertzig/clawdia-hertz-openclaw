@@ -95,6 +95,35 @@ function cardId(input) {
   return crypto.createHash('sha1').update(input).digest('hex').slice(0, 12);
 }
 
+function isNoisyFollowUpText(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (!t) return true;
+  const noisyPatterns = [
+    "didn't work",
+    'didnt work',
+    'still failing',
+    'not working',
+    'does not work',
+    'doesnt work',
+    'same error',
+    'still broken',
+    'no luck',
+    'try again',
+    'still error'
+  ];
+  return noisyPatterns.some((p) => t.includes(p));
+}
+
+function isSubstantiveSnippet(snippet) {
+  const s = String(snippet || '').trim();
+  if (!s) return false;
+  if (s.length < 12) return false;
+  const tokenCount = s.split(/\s+/).filter(Boolean).length;
+  if (tokenCount < 2) return false;
+  const codeLikeSignals = ['class ', 'public ', 'private ', 'void ', 'new ', 'extends ', '{', '}', '=>'];
+  return codeLikeSignals.some((sig) => s.includes(sig));
+}
+
 function buildPatternCards(options) {
   const opts = options || {};
   const runtimeRoot = opts.runtimeRoot || DEFAULT_RUNTIME_ROOT;
@@ -120,6 +149,11 @@ function buildPatternCards(options) {
     const outcome = outcomeLabel(dossier);
     if (!(outcome === 'worked' || outcome === 'partially_worked')) continue;
 
+    const intent = String(dossier.intent || 'unknown').toLowerCase();
+    const userMessage = String(dossier.user_message || '');
+    // Do not learn cards from low-signal follow-up chatter.
+    if (intent === 'follow_up' && isNoisyFollowUpText(userMessage)) continue;
+
     const q = qualityScore(dossier);
     if (Number.isFinite(q) && q < minQuality) continue;
 
@@ -131,13 +165,16 @@ function buildPatternCards(options) {
     dossiersUsed += 1;
 
     const query = normalizeQuery(dossier.user_message || '');
-    const intent = String(dossier.intent || 'unknown');
 
     for (const match of matches.slice(0, 4)) {
       const repo = String(match.repo || match.source_id || '').trim();
       if (!repo || repo === 'workspace' || repo === 'docs_memory') continue;
       const pathHint = String(match.path || '').trim();
       if (!pathHint) continue;
+      const matchScore = Number(match.score);
+      if (Number.isFinite(matchScore) && matchScore < 25) continue;
+      const snippetText = String(match.snippet || '').slice(0, 400);
+      if (!isSubstantiveSnippet(snippetText)) continue;
 
       const id = cardId([intent, repo, pathHint, String(match.symbol || '')].join('|'));
       if (!cards.has(id)) {
@@ -148,7 +185,7 @@ function buildPatternCards(options) {
           source_repo: repo,
           source_path: pathHint,
           symbol: match.symbol || null,
-          snippet: String(match.snippet || '').slice(0, 400),
+          snippet: snippetText,
           url: match.url || null,
           style_family: match.style_family || null,
           quality_score: Number.isFinite(Number(match.quality_score)) ? Number(match.quality_score) : (Number.isFinite(q) ? Number(q) : null),

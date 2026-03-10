@@ -100,6 +100,21 @@ function getOutcomeLabel(dossier) {
   return Object.prototype.hasOwnProperty.call(REWARD_BY_OUTCOME, label) ? label : 'unknown';
 }
 
+function isNoisyFollowUpDossier(dossier) {
+  const intent = String(dossier?.intent || '').toLowerCase();
+  if (intent !== 'follow_up') return false;
+  const t = String(dossier?.user_message || '').toLowerCase();
+  const noisyPatterns = [
+    "didn't work",
+    'didnt work',
+    'still failing',
+    'not working',
+    'same error',
+    'still broken'
+  ];
+  return noisyPatterns.some((p) => t.includes(p));
+}
+
 function extractReposFromPatternScout(dossier) {
   const matches = Array.isArray(dossier?.worker_outputs?.patternscout?.matches)
     ? dossier.worker_outputs.patternscout.matches
@@ -169,6 +184,7 @@ function learnPatternScoutWeights(options) {
 
     const ts = dossierTimestampMs(dossier);
     if (lookbackHours > 0 && ts > 0 && ts < cutoff) continue;
+    if (isNoisyFollowUpDossier(dossier)) continue;
 
     const repos = extractReposFromPatternScout(dossier);
     if (repos.length === 0) continue;
