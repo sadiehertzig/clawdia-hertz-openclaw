@@ -1666,5 +1666,192 @@
     "freshness_badge": "fresh_mixed",
     "confidence": "medium",
     "warnings": []
+  },
+  "eb673a3db8218ff33fd6b2afb3b441cbea287b7b": {
+    "ts": 1773098614777,
+    "normalized": {
+      "raw": "swerve drive command",
+      "tokens": [
+        "swerve",
+        "drive",
+        "command"
+      ],
+      "phrases": [],
+      "symbols": [],
+      "vendorHints": [],
+      "subsystemHints": [
+        "swerve"
+      ],
+      "docsHints": []
+    },
+    "matches": [
+      {
+        "tier": "gatorbots",
+        "source_id": "gatorbots-2026",
+        "repo": "gatorbots-2026",
+        "path": "mirrors/gatorbots-2026/src/main/java/frc/robot/RobotContainer.java",
+        "line_start": 56,
+        "line_end": 56,
+        "symbol": "swerve",
+        "snippet": "TunableNumber m_driveP = new TunableNumber(\"Swerve/PID/ModuleDrive/P\", SwerveParser.pidfPropertiesJson.drive.p);",
+        "score": 58,
+        "why_matched": "indexed token overlap (2)",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      },
+      {
+        "tier": "gatorbots",
+        "source_id": "gatorbots-2026",
+        "repo": "gatorbots-2026",
+        "path": "mirrors/gatorbots-2026/src/main/java/frc/robot/RobotContainer.java",
+        "line_start": 57,
+        "line_end": 57,
+        "symbol": "swerve",
+        "snippet": "TunableNumber m_driveD = new TunableNumber(\"Swerve/PID/ModuleDrive/D\", SwerveParser.pidfPropertiesJson.drive.d);",
+        "score": 58,
+        "why_matched": "indexed token overlap (2)",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      },
+      {
+        "tier": "official_examples",
+        "source_id": "official_examples",
+        "repo": "official_examples",
+        "path": "docs/runtime/patternscout-curated-repos.json",
+        "line_start": 36,
+        "line_end": 36,
+        "symbol": "swerve",
+        "snippet": "\"tags\": [\"competition-code\", \"java\", \"swerve\", \"vision\", \"advantagekit\", \"reliable\"],",
+        "score": 42,
+        "why_matched": "indexed token overlap (1)",
+        "url": null,
+        "official_source": true,
+        "evidence_receipt": "official_examples_lane",
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "archived_source": false
+      },
+      {
+        "tier": "official_examples",
+        "source_id": "official_examples",
+        "repo": "official_examples",
+        "path": "docs/CODEX_PART2_REAL_PATTERNSCOUT_CHECKER_IMPLEMENTATION.md",
+        "line_start": 307,
+        "line_end": 307,
+        "symbol": "swerve",
+        "snippet": "- probable subsystem nouns like `intake`, `swerve`, `shooter`, `beam break`",
+        "score": 39,
+        "why_matched": "indexed token overlap (1)",
+        "url": null,
+        "official_source": true,
+        "evidence_receipt": "official_examples_lane",
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "archived_source": false
+      },
+      {
+        "tier": "docs_memory",
+        "source_id": "docs_memory",
+        "repo": "docs_memory",
+        "path": "agents/clawdia/memory/docs/CODEX_PART2_REAL_PATTERNSCOUT_CHECKER_IMPLEMENTATION.md",
+        "line_start": 308,
+        "line_end": 308,
+        "symbol": "swerve",
+        "snippet": "- probable subsystem nouns like `intake`, `swerve`, `shooter`, `beam break`",
+        "score": 29,
+        "why_matched": "indexed token overlap (1)",
+        "url": null,
+        "style_family": null,
+        "freshness_days": null,
+        "source_weight": 1,
+        "quality_score": 55,
+        "official_source": false,
+        "archived_source": false,
+        "evidence_receipt": "unregistered_repo"
+      }
+    ],
+    "summary": "Found 5 weighted match(es) across gatorbots, official_examples, docs_memory",
+    "retrieval_summary": "Found 5 weighted match(es) across gatorbots, official_examples, docs_memory",
+    "coverage_note": "Moderate coverage with 5 matches; verify implementation details against official APIs.",
+    "source_tiers_used": [
+      "gatorbots",
+      "official_examples",
+      "docs_memory"
+    ],
+    "source_receipts": [
+      {
+        "repo": "gatorbots-2026",
+        "style_family": null,
+        "official_source": false,
+        "archived_source": false,
+        "freshness_days": 0,
+        "source_weight": 1,
+        "quality_score": 55,
+        "match_count": 2,
+        "top_score": 58,
+        "sample_path": "mirrors/gatorbots-2026/src/main/java/frc/robot/RobotContainer.java",
+        "evidence_receipts": [
+          "unregistered_repo"
+        ]
+      },
+      {
+        "repo": "official_examples",
+        "style_family": null,
+        "official_source": true,
+        "archived_source": false,
+        "freshness_days": 0,
+        "source_weight": 1,
+        "quality_score": 55,
+        "match_count": 2,
+        "top_score": 42,
+        "sample_path": "docs/runtime/patternscout-curated-repos.json",
+        "evidence_receipts": [
+          "official_examples_lane"
+        ]
+      },
+      {
+        "repo": "docs_memory",
+        "style_family": null,
+        "official_source": false,
+        "archived_source": false,
+        "freshness_days": 0,
+        "source_weight": 1,
+        "quality_score": 55,
+        "match_count": 1,
+        "top_score": 29,
+        "sample_path": "agents/clawdia/memory/docs/CODEX_PART2_REAL_PATTERNSCOUT_CHECKER_IMPLEMENTATION.md",
+        "evidence_receipts": [
+          "unregistered_repo"
+        ]
+      }
+    ],
+    "freshness_badge": "fresh_official",
+    "confidence": "medium",
+    "warnings": [],
+    "lane_timings": {
+      "gatorbots": 218,
+      "docs_memory": 363,
+      "official_examples": 142,
+      "learned_pattern": 0,
+      "public_frc": 0
+    },
+    "fallback_used": false,
+    "lane_parallel_used": true
   }
 }

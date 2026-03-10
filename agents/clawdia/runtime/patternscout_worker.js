@@ -41,7 +41,13 @@ const DEFAULT_CONFIG = {
     metricsPath: path.resolve(REPO_ROOT, 'runtime_state', 'patternscout', 'metrics.json'),
     keepLastSamples: 200
   },
-  repoMirrors: [],
+  repoMirrors: [
+    {
+      id: 'gatorbots-2026',
+      localPath: path.resolve(REPO_ROOT, 'mirrors', 'gatorbots-2026'),
+      tier: 'gatorbots'
+    }
+  ],
   docsRoots: [
     path.resolve(REPO_ROOT, 'agents', 'clawdia', 'memory', 'docs'),
     path.resolve(REPO_ROOT, 'agents', 'arbiter', 'memory', 'docs'),
