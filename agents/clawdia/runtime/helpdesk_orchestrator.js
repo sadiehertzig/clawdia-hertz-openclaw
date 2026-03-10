@@ -422,6 +422,7 @@ function orchestrateRequest(input, runtimeCtx) {
   dossier.noteStageStatus(reqDossier, 'plan', 'completed');
 
   const substantiveFlow = isSubstantiveIntent(intent) || executionPlan.includes('builder');
+  const reviewRequired = Boolean(substantiveFlow || hints.explicit_review || hints.safety_or_hardware);
   let deepDebugUsed = false;
 
   for (const worker of executionPlan) {
@@ -443,7 +444,7 @@ function orchestrateRequest(input, runtimeCtx) {
       dossier.recordWorkerOutput(reqDossier, worker, skipped);
       dossier.noteStageStatus(reqDossier, worker, 'skipped');
 
-      if (worker === 'arbiter' && (substantiveFlow || hints.explicit_review || hints.safety_or_hardware)) {
+      if (worker === 'arbiter' && reviewRequired) {
         dossier.markGuarded(reqDossier, 'arbiter_unavailable_for_substantive_flow');
       }
       continue;
@@ -484,7 +485,7 @@ function orchestrateRequest(input, runtimeCtx) {
     });
 
     if (normalized.status === 'error') {
-      if (worker === 'arbiter' && (substantiveFlow || hints.explicit_review || hints.safety_or_hardware)) {
+      if (worker === 'arbiter' && reviewRequired) {
         dossier.markGuarded(reqDossier, 'arbiter_failed_for_substantive_flow');
       }
       if (worker === 'deepdebug') {
@@ -514,6 +515,15 @@ function orchestrateRequest(input, runtimeCtx) {
     }
 
     dossier.noteStageStatus(reqDossier, worker, 'completed');
+  }
+
+  if (
+    reviewRequired &&
+    !reqDossier.review_state?.review_completed &&
+    !reqDossier.review_state?.escalation_completed &&
+    !reqDossier.review_state?.guarded
+  ) {
+    dossier.markGuarded(reqDossier, 'review_missing_for_substantive_flow');
   }
 
   const provisionalAnswerBadge = formatAnswerBadge(dossier.resolveAnswerMode(reqDossier));

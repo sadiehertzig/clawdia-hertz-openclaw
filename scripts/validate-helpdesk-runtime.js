@@ -96,6 +96,27 @@ function run() {
   assert.equal(substantive.dossier.self_improvement.telemetry.worker_count >= 1, true);
   console.log('ok - substantive flow includes evaluator + telemetry');
 
+  const guardedWhenArbiterUnavailable = runtime.orchestrateRequest({
+    peerId: 'validate-peer-guarded',
+    route: 'helpdesk',
+    userMessage: 'Generate a subsystem draft for intake safety and control'
+  }, {
+    runtimeRoot,
+    workerHandlers: {
+      ...workerHandlers(),
+      arbiter: () => ({
+        status: 'error',
+        summary: 'arbiter unavailable in validation',
+        skipped: true,
+        warnings: ['arbiter unavailable']
+      })
+    }
+  });
+
+  assert.equal(guardedWhenArbiterUnavailable.answer_mode, 'guarded_answer');
+  assert.equal(guardedWhenArbiterUnavailable.dossier.review_state?.guarded, true);
+  console.log('ok - substantive flow is forced guarded when arbiter is unavailable');
+
   const general = runtime.orchestrateRequest({
     peerId: 'validate-peer-general',
     route: 'helpdesk',
