@@ -223,6 +223,18 @@ function formatCheckerBadge(checkerOutput, executionPlan) {
   return '[checks skipped]';
 }
 
+function formatWorkerActivity(dossierObj) {
+  const trace = Array.isArray(dossierObj?.worker_trace) ? dossierObj.worker_trace : [];
+  const interesting = trace.filter((t) => t && t.worker && t.worker !== 'coach_evaluator' && t.status === 'started');
+  if (interesting.length === 0) return null;
+  const names = Array.from(new Set(interesting.map((t) => String(t.worker))));
+  const labels = names.map((name) => {
+    const pretty = name.replace(/_/g, ' ');
+    return pretty.charAt(0).toUpperCase() + pretty.slice(1);
+  });
+  return `${labels.join(' • ')} working...`;
+}
+
 function pickPrimarySummary(dossierObj) {
   const outputs = dossierObj?.worker_outputs || {};
   const workerOrder = ['arbiter', 'deepdebug', 'builder', 'librarian', 'patternscout'];
@@ -250,8 +262,10 @@ function composeFinalMessage(options) {
   const markers = (Array.isArray(opts.statusMarkers) ? opts.statusMarkers : []).filter(Boolean).join(' ').trim();
   const summary = pickPrimarySummary(d);
   const parts = [];
+  const workerActivity = formatWorkerActivity(d);
 
   if (markers) parts.push(markers);
+  if (workerActivity) parts.push(workerActivity);
   if (summary) parts.push(summary);
 
   const checkerBadge = opts.checkerBadge || null;

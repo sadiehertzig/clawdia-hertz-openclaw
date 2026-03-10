@@ -1,0 +1,25 @@
+name: Helpdesk CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate-helpdesk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate helpdesk runtime regressions
+        run: node scripts/validate-helpdesk-runtime.js
+
+      - name: Validate PatternScout improvements regressions
+        run: node scripts/validate-patternscout-improvements.js
