@@ -404,9 +404,48 @@ function testContractFuzzAndQualityGate() {
   });
   assert.equal(strict.status, 'success');
   assert.equal(Array.isArray(strict.matches), true);
-  assert.equal(strict.matches.length, 0);
+  assert.equal(strict.confidence, 'low');
+  assert.equal(strict.matches.length <= 2, true);
+  assert.equal(Array.isArray(strict.warnings), true);
+  assert.equal(strict.warnings.some((w) => String(w).includes('quality gate rejected retrieval')), true);
   assert.equal(typeof strict.coverage_note, 'string');
-  assert.equal(strict.coverage_note.toLowerCase().includes('insufficient'), true);
+  assert.equal(strict.coverage_note.toLowerCase().includes('low-confidence'), true);
+
+  // Soft-fail regression: if gate fails but evidence exists, return low-confidence hints
+  const repo = path.join(root, 'softfail-repo');
+  ensureDir(path.join(repo, 'src'));
+  writeFile(path.join(repo, 'src', 'Hint.java'), [
+    'public class Hint {',
+    '  void intakeAlpha() {}',
+    '}'
+  ].join('\n'));
+
+  const softFail = patternScoutWorker({
+    request_id: 'req_quality_gate_soft_fail',
+    user_message: 'intakeAlpha implementation',
+    intent: 'subsystem_or_command_draft',
+    patternscout_config: {
+      ...baseConfig,
+      maxMatches: 6,
+      repoMirrors: [{ id: 'soft/fail', localPath: repo, tier: 'gatorbots' }],
+      qualityGate: {
+        enabled: true,
+        minTopScore: 999,
+        minDistinctRepos: 5,
+        minEvidenceReceipts: 5
+      }
+    }
+  });
+
+  assert.equal(softFail.status, 'success');
+  assert.equal(softFail.confidence, 'low');
+  assert.equal(Array.isArray(softFail.matches), true);
+  assert.equal(softFail.matches.length > 0, true);
+  assert.equal(softFail.matches.length <= 2, true);
+  assert.equal(Array.isArray(softFail.warnings), true);
+  assert.equal(softFail.warnings.some((w) => String(w).includes('quality gate rejected retrieval')), true);
+  assert.equal(typeof softFail.coverage_note, 'string');
+  assert.equal(softFail.coverage_note.toLowerCase().includes('low-confidence'), true);
 
   const fuzzPayloads = [
     null,

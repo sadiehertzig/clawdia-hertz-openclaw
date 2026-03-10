@@ -151,7 +151,19 @@ function normalizeQuery(rawQuery) {
     }
   }
 
-  const lowerTokens = Array.from(new Set(expandedTokens.map((t) => t.toLowerCase())));
+  const STOP_TOKENS = new Set([
+    'a', 'an', 'the', 'and', 'or', 'to', 'of', 'for', 'in', 'on', 'at', 'by', 'with',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'it', 'this', 'that', 'these',
+    'those', 'i', 'you', 'we', 'they', 'he', 'she', 'them', 'my', 'your', 'our',
+    // common contraction fragments/noise
+    's', 't', 're', 've', 'll', 'd', 'm'
+  ]);
+
+  const lowerTokens = Array.from(new Set(
+    expandedTokens
+      .map((t) => t.toLowerCase())
+      .filter((t) => t && !STOP_TOKENS.has(t) && (t.length >= 2 || /\d/.test(t)))
+  ));
   const phrases = [];
 
   const quoteRegex = /"([^"]+)"/g;
@@ -199,9 +211,18 @@ function writeCache(config, cache) {
   writeJson(getCacheFile(config), cache);
 }
 
+const COMMAND_AVAILABLE_CACHE = new Map();
+
 function hasCommand(name) {
-  const out = spawnSync('bash', ['-lc', `command -v ${name}`], { encoding: 'utf8' });
-  return out.status === 0;
+  const key = String(name || '').trim();
+  if (!key) return false;
+  if (COMMAND_AVAILABLE_CACHE.has(key)) {
+    return Boolean(COMMAND_AVAILABLE_CACHE.get(key));
+  }
+  const out = spawnSync('bash', ['-lc', `command -v ${key}`], { encoding: 'utf8' });
+  const ok = out.status === 0;
+  COMMAND_AVAILABLE_CACHE.set(key, ok);
+  return ok;
 }
 
 function hashValue(raw) {
@@ -1821,9 +1842,23 @@ function patternScoutWorker(payload) {
     freshnessBadge = 'unknown';
     confidence = 'low';
   }
+  if (!qualityGate.passed && scored.length > 0) {
+    // Soft-fail behavior: keep a tiny set of best-effort evidence with explicit warnings
+    // instead of returning an empty retrieval payload.
+    const softLimit = Math.min(2, Math.max(1, maxMatches));
+    finalMatches = dedupeMatches(scored, softLimit, 1).map((row) => ({
+      ...row,
+      why_matched: `${row.why_matched || 'matched pattern'} [quality-gate-soft-fail]`
+    }));
+    sourceReceipts = buildSourceReceipts(finalMatches);
+    tiersUsed = Array.from(new Set(finalMatches.map((m) => m.tier)));
+    freshnessBadge = computeFreshnessBadge(sourceReceipts);
+    confidence = 'low';
+  }
+
   const coverageNote = qualityGate.passed
     ? buildCoverageNote(finalMatches, sourceReceipts, confidence)
-    : 'Insufficient retrieval evidence after quality gate; ask a clarifying question or broaden search.';
+    : 'Insufficient retrieval evidence after quality gate; returning low-confidence hints only. Verify against official docs before implementation.';
 
   const retrievalSummary = finalMatches.length
     ? `Found ${finalMatches.length} weighted match(es) across ${tiersUsed.join(', ')}`
