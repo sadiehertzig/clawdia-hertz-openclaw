@@ -412,7 +412,8 @@ function searchIndex(indexData, normalized, laneTier, laneRepo, limit, extraFiel
       const row = scoreMap.get(key);
       row.score += 6;
       row.tokenHits.add(token);
-      if (queryTokens.includes(String(hit.s || '').toLowerCase())) {
+      const snippetLower = String(hit.s || '').toLowerCase();
+      if (queryTokens.some((token) => snippetLower.includes(token))) {
         row.score += 2;
       }
     }

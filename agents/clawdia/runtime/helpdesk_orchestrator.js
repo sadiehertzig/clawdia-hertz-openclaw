@@ -66,7 +66,15 @@ function loadLikelyParentDossier(options) {
 
     const explicitGlobalParent = dossier.loadRequestDossierById(explicitParentRequestId, { runtimeRoot: opts.runtimeRoot });
     if (explicitGlobalParent) {
-      return explicitGlobalParent;
+      const sameConversation = dossier.isSameConversation(
+        explicitGlobalParent,
+        opts.chatId,
+        opts.threadOrTopicId
+      );
+      if (sameConversation || (!opts.chatId && !opts.threadOrTopicId)) {
+        return explicitGlobalParent;
+      }
+      return null;
     }
   }
 
@@ -224,15 +232,18 @@ function formatCheckerBadge(checkerOutput, executionPlan) {
 }
 
 function formatWorkerActivity(dossierObj) {
-  const trace = Array.isArray(dossierObj?.worker_trace) ? dossierObj.worker_trace : [];
-  const interesting = trace.filter((t) => t && t.worker && t.worker !== 'coach_evaluator' && t.status === 'started');
-  if (interesting.length === 0) return null;
-  const names = Array.from(new Set(interesting.map((t) => String(t.worker))));
-  const labels = names.map((name) => {
+  const outputs = dossierObj?.worker_outputs && typeof dossierObj.worker_outputs === 'object'
+    ? dossierObj.worker_outputs
+    : {};
+  const names = Object.entries(outputs)
+    .filter(([worker, out]) => worker !== 'coach_evaluator' && out && out.status !== 'error')
+    .map(([worker]) => String(worker));
+  if (names.length === 0) return null;
+  const labels = Array.from(new Set(names)).map((name) => {
     const pretty = name.replace(/_/g, ' ');
     return pretty.charAt(0).toUpperCase() + pretty.slice(1);
   });
-  return `${labels.join(' • ')} working...`;
+  return `Workers used: ${labels.join(' • ')}`;
 }
 
 function pickPrimarySummary(dossierObj) {

@@ -96,7 +96,13 @@ function run() {
   assert.equal(typeof substantive.dossier.self_improvement.quality_evaluation, 'object');
   assert.equal(typeof substantive.dossier.self_improvement.telemetry, 'object');
   assert.equal(substantive.dossier.self_improvement.telemetry.worker_count >= 1, true);
+  assert.equal(String(substantive.final_message || '').includes('working...'), false);
+  assert.equal(String(substantive.final_message || '').includes('Workers used:'), true);
   console.log('ok - substantive flow includes evaluator + telemetry');
+
+  const deepDebugIntent = runtime.quickClassify('please do a deep debug root cause analysis on this hard frc robot bug').intent;
+  assert.equal(deepDebugIntent, 'deep_debug');
+  console.log('ok - deep debug intent routing is not shadowed');
 
   const guardedWhenArbiterUnavailable = runtime.orchestrateRequest({
     peerId: 'validate-peer-guarded',
@@ -204,6 +210,23 @@ function run() {
   assert.equal(explicitParentAcrossSessions.dossier.parent_request_id, groupParent.dossier.request_id);
   assert.equal(explicitParentAcrossSessions.dossier.context.parent_intent, groupParent.intent);
   console.log('ok - explicit parent_request_id resolves across peer sessions');
+
+  const explicitParentWrongConversation = runtime.orchestrateRequest({
+    peerId: 'validate-group-peer-z',
+    route: 'helpdesk',
+    chatId: '-100otherchat',
+    threadOrTopicId: '99',
+    conversationContext: {
+      parent_request_id: groupParent.dossier.request_id
+    },
+    userMessage: 'can you use that same parent context?'
+  }, {
+    runtimeRoot,
+    workerHandlers: workerHandlers()
+  });
+
+  assert.equal(explicitParentWrongConversation.dossier.parent_request_id, null);
+  console.log('ok - explicit parent_request_id rejected across mismatched conversation');
 
   const labeled = runtime.updateOutcomeLabel(child.dossier.request_id, 'worked', {
     source: 'manual',

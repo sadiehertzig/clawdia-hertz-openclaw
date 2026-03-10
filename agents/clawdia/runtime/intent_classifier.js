@@ -160,12 +160,12 @@ function heuristicIntent(prompt, hints) {
     return 'sensor_or_can_fault';
   }
 
-  if (includesAny(text, ['review', 'explain', 'why', 'debug', 'what is wrong'])) {
-    return 'explain_or_review';
-  }
-
   if (includesAny(text, ['root cause', 'deep debug', 'multi file', 'hard bug'])) {
     return 'deep_debug';
+  }
+
+  if (includesAny(text, ['review', 'explain', 'why', 'debug', 'what is wrong'])) {
+    return 'explain_or_review';
   }
 
   if (includesAny(text, ['write', 'generate', 'create', 'scaffold', 'subsystem', 'command'])) {
