@@ -19,7 +19,13 @@ _ENV_FILE = Path.home() / ".openclaw" / ".env"
 
 
 def _load_telegram_config() -> dict:
-    """Load bot token and owner chat ID from OpenClaw config."""
+    """Load bot token and owner chat ID from OpenClaw config.
+
+    Env vars (highest priority):
+        OPENCLAW_TELEGRAM_BOT_TOKEN — the bot token
+        OPENCLAW_TELEGRAM_OWNER_CHAT_ID — the owner's chat ID (preferred)
+        OPENCLAW_TELEGRAM_CHAT_ID — fallback chat ID
+    """
     bot_token = os.environ.get("OPENCLAW_TELEGRAM_BOT_TOKEN", "")
 
     # Try openclaw.json
@@ -34,17 +40,39 @@ def _load_telegram_config() -> dict:
         except (json.JSONDecodeError, KeyError):
             pass
 
-    # Find the owner's chat ID from sessions
-    chat_id = os.environ.get("OPENCLAW_TELEGRAM_CHAT_ID", "")
+    # Validate bot token — real tokens are ~46 chars (e.g. "123456789:AABBccdd...")
+    if bot_token and len(bot_token) < 30:
+        print(f"WARNING: TELEGRAM_BOT_TOKEN looks invalid ({len(bot_token)} chars, "
+              f"expected ~46). Telegram notifications disabled.", file=sys.stderr)
+        bot_token = ""
+
+    # Find the owner's chat ID — prefer explicit env var over session auto-detect
+    chat_id = (
+        os.environ.get("OPENCLAW_TELEGRAM_OWNER_CHAT_ID", "")
+        or os.environ.get("OPENCLAW_TELEGRAM_CHAT_ID", "")
+    )
     if not chat_id:
+        # Fallback: try openclaw.json for owner chat ID
+        if _OC_CONFIG.exists():
+            try:
+                cfg = json.loads(_OC_CONFIG.read_text())
+                tg = cfg.get("channels", {}).get("telegram", {})
+                chat_id = str(tg.get("ownerChatId", ""))
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+    if not chat_id:
+        # Last resort: session auto-detect (may pick wrong user)
         sessions_file = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
         if sessions_file.exists():
             try:
                 sessions = json.loads(sessions_file.read_text())
                 for key in sessions:
                     if "telegram:direct:" in key:
-                        # Extract chat ID from key like "agent:main:telegram:direct:8739067231"
                         chat_id = key.split("telegram:direct:")[-1]
+                        print(f"WARNING: Using auto-detected Telegram chat_id={chat_id}. "
+                              f"Set OPENCLAW_TELEGRAM_OWNER_CHAT_ID to override.",
+                              file=sys.stderr)
                         break
             except (json.JSONDecodeError, KeyError):
                 pass

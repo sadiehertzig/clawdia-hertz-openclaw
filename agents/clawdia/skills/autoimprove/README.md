@@ -51,12 +51,14 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 
 ### Optional: Telegram Approval
 
-AutoImprove can send proposed changes to Telegram for manual approval before committing. Set these in `~/.openclaw/openclaw.json` or as environment variables:
+AutoImprove can send proposed changes to Telegram for manual approval before committing. Set these as environment variables in `~/.openclaw/.env`:
 
 ```
-OPENCLAW_TELEGRAM_BOT_TOKEN=...
-OPENCLAW_TELEGRAM_CHAT_ID=...
+OPENCLAW_TELEGRAM_BOT_TOKEN=123456789:AABBccddEEff...   # ~46 chars
+OPENCLAW_TELEGRAM_OWNER_CHAT_ID=-5262972334             # your chat/group ID
 ```
+
+`OPENCLAW_TELEGRAM_OWNER_CHAT_ID` is the recommended way to set the destination — without it, AutoImprove falls back to auto-detecting from sessions.json, which may pick the wrong user. Use a negative ID for group chats.
 
 Without Telegram configured, AutoImprove runs fully autonomously (ratchet still prevents regressions).
 

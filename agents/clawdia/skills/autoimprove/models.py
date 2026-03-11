@@ -21,8 +21,19 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 # ─────────────────────────────────────────────────────────
 
 def _strip_markdown_fences(text: str) -> str:
-    """Strip markdown code fences and optional 'json' language tag."""
+    """Strip markdown code fences and optional 'json' language tag.
+
+    Handles leading text before the fence, e.g.:
+        Here are the questions:
+        ```json
+        [...]
+        ```
+    """
     text = text.strip()
+    # If the fence isn't at the start, find the first ``` and discard everything before it
+    if "```" in text and not text.startswith("```"):
+        fence_start = text.find("```")
+        text = text[fence_start:]
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text[3:]
     if text.endswith("```"):
