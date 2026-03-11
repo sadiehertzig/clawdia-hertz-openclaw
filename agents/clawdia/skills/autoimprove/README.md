@@ -51,14 +51,13 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 
 ### Optional: Telegram Approval
 
-AutoImprove can send proposed changes to Telegram for manual approval before committing. Set these as environment variables in `~/.openclaw/.env`:
+AutoImprove can send proposed changes to Telegram for manual approval before committing. Set your bot token in `~/.openclaw/.env`:
 
 ```
 OPENCLAW_TELEGRAM_BOT_TOKEN=123456789:AABBccddEEff...   # ~46 chars
-OPENCLAW_TELEGRAM_OWNER_CHAT_ID=-5262972334             # your chat/group ID
 ```
 
-`OPENCLAW_TELEGRAM_OWNER_CHAT_ID` is the recommended way to set the destination — without it, AutoImprove falls back to auto-detecting from sessions.json, which may pick the wrong user. Use a negative ID for group chats.
+The destination chat ID is auto-detected from your active Telegram session — whoever is chatting with the OpenClaw instance gets the notifications. To override, set `OPENCLAW_TELEGRAM_OWNER_CHAT_ID` in your env.
 
 Without Telegram configured, AutoImprove runs fully autonomously (ratchet still prevents regressions).
 
@@ -92,14 +91,14 @@ Depending on the size of your test bank and grading tier, costs per iteration va
 | `tiered` | ~$0.02-0.20 (quick first, escalates ambiguous) |
 | `full_panel` | ~$0.20 (full Three-Body Council, 3 models x 3 rounds) |
 
-A typical 20-question test bank with `tiered` grading runs **~$1-4 per iteration**. A full sweep (10 rounds x 5 iterations) could cost **$50-200** depending on convergence speed.
+A typical 10-question test bank with `tiered` grading runs **~$0.50-2 per iteration**. A full sweep (10 rounds x 5 iterations) could cost **$25-100** depending on convergence speed.
 
 ### Controlling costs
 
 - **`token_budget`** in your program.md — hard cap on total tokens consumed (default: 1,000,000). The loop stops when this is hit.
 - **`max_iterations`** in your program.md — caps the number of edit-score cycles per run (default: 15)
 - **`grading_tier: quick_only`** — use single-model grading during development, switch to `tiered` or `full_panel` for final passes
-- **Smaller test banks** — start with 15-20 questions; Channel C will expand coverage where needed
+- **Smaller test banks** — start with 10 questions; Channel C will expand coverage where needed
 - **Monitor `token_usage.json`** — check cumulative spend between runs and adjust strategy
 - **`autoimprove pause [skill]`** — stop nightly runs if costs are climbing faster than scores
 

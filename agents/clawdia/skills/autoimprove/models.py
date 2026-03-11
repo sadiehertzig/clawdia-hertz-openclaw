@@ -207,7 +207,7 @@ class AutoImproveConfig:
     grading_tier: str = "tiered"           # tiered | full_panel | quick_only
     regression_threshold: float = 0.15
     min_improvement: float = 0.01
-    min_test_questions: int = 15
+    min_test_questions: int = 10
 
     # budget
     max_iterations: int = 15

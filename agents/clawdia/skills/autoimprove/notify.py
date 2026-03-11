@@ -46,23 +46,14 @@ def _load_telegram_config() -> dict:
               f"expected ~46). Telegram notifications disabled.", file=sys.stderr)
         bot_token = ""
 
-    # Find the owner's chat ID — prefer explicit env var over session auto-detect
+    # Find the owner's chat ID — auto-detect from active Telegram session,
+    # with env var override for multi-user setups.
     chat_id = (
         os.environ.get("OPENCLAW_TELEGRAM_OWNER_CHAT_ID", "")
         or os.environ.get("OPENCLAW_TELEGRAM_CHAT_ID", "")
     )
     if not chat_id:
-        # Fallback: try openclaw.json for owner chat ID
-        if _OC_CONFIG.exists():
-            try:
-                cfg = json.loads(_OC_CONFIG.read_text())
-                tg = cfg.get("channels", {}).get("telegram", {})
-                chat_id = str(tg.get("ownerChatId", ""))
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-    if not chat_id:
-        # Last resort: session auto-detect (may pick wrong user)
+        # Auto-detect from the active Telegram session
         sessions_file = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
         if sessions_file.exists():
             try:
@@ -70,9 +61,6 @@ def _load_telegram_config() -> dict:
                 for key in sessions:
                     if "telegram:direct:" in key:
                         chat_id = key.split("telegram:direct:")[-1]
-                        print(f"WARNING: Using auto-detected Telegram chat_id={chat_id}. "
-                              f"Set OPENCLAW_TELEGRAM_OWNER_CHAT_ID to override.",
-                              file=sys.stderr)
                         break
             except (json.JSONDecodeError, KeyError):
                 pass
