@@ -8,6 +8,7 @@ const DEFAULT_RUNTIME_ROOT = path.resolve(__dirname, '..', '..', '..', 'runtime_
 const DOSSIER_SCHEMA_VERSION = 2;
 const OUTCOME_LABELS = new Set(['unknown', 'worked', 'partially_worked', 'failed', 'unsafe']);
 const OUTCOME_SOURCES = new Set(['system', 'manual', 'reaction', 'user_follow_up', 'follow_up_inference']);
+const SAFE_ID_RE = /^[A-Za-z0-9._-]{1,128}$/;
 
 function nowIso(date) {
   return (date instanceof Date ? date : new Date()).toISOString();
@@ -20,6 +21,16 @@ function sanitizeIdPart(value, fallback) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 48);
   return safe || fallback;
+}
+
+function normalizeSafeId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  if (!SAFE_ID_RE.test(normalized)) return null;
+  if (normalized.includes('..')) return null;
+  if (normalized.includes('/') || normalized.includes('\\')) return null;
+  return normalized;
 }
 
 function makeRequestId(now) {
@@ -116,8 +127,12 @@ function ensureSelfImprovementState(dossier) {
 }
 
 function ensureSessionDirs(sessionId, options) {
+  const safeSessionId = normalizeSafeId(sessionId);
+  if (!safeSessionId) {
+    throw new Error('invalid session_id');
+  }
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
-  const sessionDir = path.join(runtimeRoot, sessionId);
+  const sessionDir = path.join(runtimeRoot, safeSessionId);
   const requestsDir = path.join(sessionDir, 'requests');
   fs.mkdirSync(requestsDir, { recursive: true });
   return { sessionDir, requestsDir };
@@ -170,15 +185,18 @@ function readJsonIfExists(filePath) {
 }
 
 function loadLatestDossier(sessionId, options) {
-  if (!sessionId) return null;
+  const safeSessionId = normalizeSafeId(sessionId);
+  if (!safeSessionId) return null;
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
-  return readJsonIfExists(path.join(runtimeRoot, sessionId, 'latest.json'));
+  return readJsonIfExists(path.join(runtimeRoot, safeSessionId, 'latest.json'));
 }
 
 function loadRequestDossier(sessionId, requestId, options) {
-  if (!sessionId || !requestId) return null;
+  const safeSessionId = normalizeSafeId(sessionId);
+  const safeRequestId = normalizeSafeId(requestId);
+  if (!safeSessionId || !safeRequestId) return null;
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
-  return readJsonIfExists(path.join(runtimeRoot, sessionId, 'requests', `${requestId}.json`));
+  return readJsonIfExists(path.join(runtimeRoot, safeSessionId, 'requests', `${safeRequestId}.json`));
 }
 
 function isSameConversation(dossier, chatId, threadOrTopicId) {
@@ -690,14 +708,15 @@ function renderHumanDossierNote(dossier) {
 
 function findRequestJsonPath(requestId, runtimeRoot) {
   const root = runtimeRoot || DEFAULT_RUNTIME_ROOT;
-  if (!requestId || !fs.existsSync(root)) return null;
+  const safeRequestId = normalizeSafeId(requestId);
+  if (!safeRequestId || !fs.existsSync(root)) return null;
 
   const sessions = fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 
   for (const sessionName of sessions) {
-    const jsonPath = path.join(root, sessionName, 'requests', `${requestId}.json`);
+    const jsonPath = path.join(root, sessionName, 'requests', `${safeRequestId}.json`);
     if (fs.existsSync(jsonPath)) {
       return {
         sessionId: sessionName,
@@ -718,14 +737,15 @@ function loadRequestDossierById(requestId, options) {
 
 function findRequestMarkdownPath(requestId, runtimeRoot) {
   const root = runtimeRoot || DEFAULT_RUNTIME_ROOT;
-  if (!requestId || !fs.existsSync(root)) return null;
+  const safeRequestId = normalizeSafeId(requestId);
+  if (!safeRequestId || !fs.existsSync(root)) return null;
 
   const sessions = fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name);
 
   for (const sessionName of sessions) {
-    const mdPath = path.join(root, sessionName, 'requests', `${requestId}.md`);
+    const mdPath = path.join(root, sessionName, 'requests', `${safeRequestId}.md`);
     if (fs.existsSync(mdPath)) {
       return mdPath;
     }
@@ -735,14 +755,19 @@ function findRequestMarkdownPath(requestId, runtimeRoot) {
 }
 
 function writeHumanDossierNote(requestId, note, options) {
+  const safeRequestId = normalizeSafeId(requestId);
+  if (!safeRequestId) return false;
+
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
   const sessionId = options?.sessionId || null;
+  const safeSessionId = sessionId ? normalizeSafeId(sessionId) : null;
 
   let requestNotePath = null;
   if (sessionId) {
-    requestNotePath = path.join(runtimeRoot, sessionId, 'requests', `${requestId}.md`);
+    if (!safeSessionId) return false;
+    requestNotePath = path.join(runtimeRoot, safeSessionId, 'requests', `${safeRequestId}.md`);
   } else {
-    requestNotePath = findRequestMarkdownPath(requestId, runtimeRoot);
+    requestNotePath = findRequestMarkdownPath(safeRequestId, runtimeRoot);
   }
 
   if (!requestNotePath) return false;
@@ -758,6 +783,9 @@ function saveDossier(dossier, options) {
 
   if (!dossier.session_id || !dossier.request_id) {
     throw new Error('dossier.session_id and dossier.request_id are required');
+  }
+  if (!normalizeSafeId(dossier.session_id) || !normalizeSafeId(dossier.request_id)) {
+    throw new Error('invalid dossier id(s)');
   }
 
   const runtimeRoot = options?.runtimeRoot || DEFAULT_RUNTIME_ROOT;
@@ -789,16 +817,19 @@ function saveDossier(dossier, options) {
 
 function updateOutcomeLabel(requestId, label, options) {
   const opts = options || {};
+  const safeRequestId = normalizeSafeId(requestId);
+  if (!safeRequestId) return null;
   const runtimeRoot = opts.runtimeRoot || DEFAULT_RUNTIME_ROOT;
   let sessionId = opts.sessionId || null;
+  if (sessionId && !normalizeSafeId(sessionId)) return null;
   let dossier = null;
 
   if (sessionId) {
-    dossier = loadRequestDossier(sessionId, requestId, { runtimeRoot });
+    dossier = loadRequestDossier(sessionId, safeRequestId, { runtimeRoot });
   }
 
   if (!dossier) {
-    const located = findRequestJsonPath(requestId, runtimeRoot);
+    const located = findRequestJsonPath(safeRequestId, runtimeRoot);
     if (!located) return null;
     sessionId = located.sessionId;
     dossier = readJsonIfExists(located.path);

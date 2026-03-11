@@ -274,6 +274,29 @@ function run() {
   assert.equal(explicitParentWrongConversation.dossier.parent_request_id, null);
   console.log('ok - explicit parent_request_id rejected across mismatched conversation');
 
+  const traversalParentAttempt = runtime.orchestrateRequest({
+    peerId: 'validate-group-peer-traversal',
+    route: 'helpdesk',
+    chatId: '-100gatorbots',
+    threadOrTopicId: '42',
+    conversationContext: {
+      parent_request_id: '../../../../etc/passwd'
+    },
+    userMessage: 'Need help understanding drivetrain limits'
+  }, {
+    runtimeRoot,
+    workerHandlers: workerHandlers()
+  });
+
+  assert.equal(traversalParentAttempt.dossier.parent_request_id, null);
+  console.log('ok - traversal-like parent_request_id is rejected');
+
+  const directTraversalLoad = runtime.loadRequestDossier('../evil', '../../outside', { runtimeRoot });
+  assert.equal(directTraversalLoad, null);
+  const directTraversalLabel = runtime.updateOutcomeLabel('../../outside', 'worked', { runtimeRoot });
+  assert.equal(directTraversalLabel, null);
+  console.log('ok - traversal-like dossier ids are ignored by load/update helpers');
+
   const labeled = runtime.updateOutcomeLabel(child.dossier.request_id, 'worked', {
     source: 'manual',
     note: 'Verified manually in validation script',

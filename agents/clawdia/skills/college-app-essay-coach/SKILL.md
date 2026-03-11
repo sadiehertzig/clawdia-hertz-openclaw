@@ -1,7 +1,9 @@
 ---
 name: college-app-essay-coach
 description: "Coach students on brainstorming, structuring, and revising college application writing without drafting or rewriting submission-ready text. Use for Common App essays, supplemental essays, activity descriptions, and Additional Information."
-homepage: https://github.com/sadiehertzig/clawdia-hertz-openclaw
+metadata:
+  author: "Sadie Hertzig"
+  homepage: "https://github.com/sadiehertzig/clawdia-hertz-openclaw"
 ---
 
 # College Application Essay Coach
@@ -193,4 +195,3 @@ Conversational and direct. Be honest. End with a clear next step.
 When praising, be specific: not "great essay" but "the image of debugging at 3am with your cat on the keyboard — that detail makes an AO smile. Protect it."
 
 When refusing: "I won't write that for you. But here's how to think about it..."
-

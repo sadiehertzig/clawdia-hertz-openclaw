@@ -14,6 +14,7 @@ Usage:
 import asyncio
 import json
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -303,10 +304,20 @@ def _http_error_details(resp: requests.Response) -> str:
         body = json.dumps(resp.json(), ensure_ascii=False)
     except Exception:
         body = (resp.text or "").strip()
-    body = body.replace("\n", " ")
+    body = _redact_sensitive(body.replace("\n", " "))
     if len(body) > 1400:
         body = body[:1400] + "..."
     return f"{resp.status_code} {resp.reason}: {body}"
+
+
+def _redact_sensitive(text: str) -> str:
+    """Redact obvious secret-bearing substrings from logs/errors."""
+    redacted = str(text or "")
+    redacted = re.sub(r"([?&](?:key|api_key|token)=)[^&\s]+", r"\1[REDACTED]", redacted, flags=re.IGNORECASE)
+    redacted = re.sub(r"(Bearer\s+)[A-Za-z0-9._-]+", r"\1[REDACTED]", redacted, flags=re.IGNORECASE)
+    redacted = re.sub(r'("?(?:x-api-key|authorization|api[_-]?key|token)"?\s*[:=]\s*"?)[^",\s}]+',
+                      r"\1[REDACTED]", redacted, flags=re.IGNORECASE)
+    return redacted
 
 
 def _extract_openai_responses_text(data: dict) -> str:
@@ -418,10 +429,13 @@ def _call_google_sync(api_key: str, model_id: str,
                       system: str, user_msg: str) -> str:
     """Call Google Gemini API."""
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{model_id}:generateContent?key={api_key}")
+           f"{model_id}:generateContent")
     resp = requests.post(
         url,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
         json={
             "system_instruction": {"parts": [{"text": system}]},
             "contents": [{"parts": [{"text": user_msg}]}],
@@ -513,7 +527,7 @@ class ThreeBodyCouncil:
             self._log(f"  OK {cfg.name} responded ({len(result)} chars)")
             return result
         except Exception as e:
-            self._log(f"  FAIL {cfg.name} failed: {e}")
+            self._log(f"  FAIL {cfg.name} failed: {_redact_sensitive(str(e))}")
             raise
 
     def _call_models_parallel(self, calls: dict) -> dict:
