@@ -82,6 +82,6 @@ The college-app-essay-coach skill (when installed) has strict refusal logic. Whe
 
 ## After Making Changes
 
-1. Restart OpenClaw: sudo systemctl restart openclaw (or pm2 restart openclaw)
+1. Restart OpenClaw: systemctl --user restart openclaw-gateway
 1. Push to GitHub: git add . && git commit -m “description” && git push origin main
 1. If updating a ClawHub-published skill, bump the version and republish
