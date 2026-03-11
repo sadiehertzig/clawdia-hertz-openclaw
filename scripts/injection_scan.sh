@@ -6,6 +6,13 @@
 # ═══════════════════════════════════════════════════════════════════
 set -euo pipefail
 
+# ─── LOAD ENV ────────────────────────────────────────────────────
+if [ -f /home/openclaw/.openclaw/.env ]; then
+  set -a
+  source /home/openclaw/.openclaw/.env
+  set +a
+fi
+
 # ─── CONFIGURATION (edit these three values) ─────────────────────
 TELEGRAM_TOKEN="${OPENCLAW_TELEGRAM_BOT_TOKEN:-YOUR_DEFAULT_BOT_TOKEN}"  # <-- REPLACE with bot token from config.json
 CHAT_IDS=("${OPENCLAW_TELEGRAM_CHAT_ID:-YOUR_CHAT_ID}")                 # <-- REPLACE with chat ID(s), e.g. ("123456" "789012")

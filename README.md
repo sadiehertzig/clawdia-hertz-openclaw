@@ -19,6 +19,7 @@ Run plan + implementation:
 Self-improvement utilities:
 
 ```bash
+./scripts/secret-scan.sh
 node scripts/validate-helpdesk-runtime.js
 node scripts/validate-three-body-council.js
 node scripts/validate-patternscout-improvements.js

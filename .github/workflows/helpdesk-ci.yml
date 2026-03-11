@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Secret scan (worktree + archives + history)
+        run: ./scripts/secret-scan.sh
+
       - name: Validate helpdesk runtime regressions
         run: node scripts/validate-helpdesk-runtime.js
 
