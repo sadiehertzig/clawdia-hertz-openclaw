@@ -441,7 +441,7 @@ function orchestrateRequest(input, runtimeCtx) {
   }
 
   const executionPlan = planForIntent(intent, hints, parentDossier);
-  const executionPlanWithEvaluation = uniquePlan(executionPlan.concat(['coach_evaluator']));
+  let executionPlanWithEvaluation = uniquePlan(executionPlan.concat(['coach_evaluator']));
   dossier.noteHumanEvent(reqDossier, 'execution_plan', executionPlan.join(' -> '));
   dossier.setExecutionPlanTelemetry(reqDossier, executionPlanWithEvaluation);
   dossier.noteStageStatus(reqDossier, 'plan', 'completed');
@@ -550,6 +550,9 @@ function orchestrateRequest(input, runtimeCtx) {
   ) {
     dossier.markGuarded(reqDossier, 'review_missing_for_substantive_flow');
   }
+
+  executionPlanWithEvaluation = uniquePlan(executionPlan.concat(['coach_evaluator']));
+  dossier.setExecutionPlanTelemetry(reqDossier, executionPlanWithEvaluation);
 
   const provisionalAnswerBadge = formatAnswerBadge(dossier.resolveAnswerMode(reqDossier));
   const checkerBadge = formatCheckerBadge(reqDossier.worker_outputs?.checker, executionPlan);

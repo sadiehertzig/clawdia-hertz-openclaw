@@ -14,4 +14,5 @@
 - See memory/2026-03-09.md for first live test session details.
 
 ## Pending Reminders
+- **2026-03-11 12:00 UTC** — Remind Gregory to switch model priority back to Anthropic after temporary Codex-first failover change.
 - **2026-03-11 22:40 UTC** — Remind Gregory to get an OpenAI API key for memory embedding fallback (faster than local). Add as OPENAI_API_KEY in gateway env.

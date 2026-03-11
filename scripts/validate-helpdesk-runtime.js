@@ -125,6 +125,52 @@ function run() {
   assert.equal(guardedWhenArbiterUnavailable.dossier.review_state?.guarded, true);
   console.log('ok - substantive flow is forced guarded when arbiter is unavailable');
 
+  let deepDebugCalls = 0;
+  const escalated = runtime.orchestrateRequest({
+    peerId: 'validate-peer-escalate',
+    route: 'helpdesk',
+    userMessage: 'Generate an FRC robot drivetrain subsystem; intermittent oscillation and drift under load'
+  }, {
+    runtimeRoot,
+    workerHandlers: {
+      ...workerHandlers(),
+      arbiter: () => ({
+        status: 'success',
+        summary: 'arbiter escalate',
+        verdict: 'escalate',
+        concern_list: [{ id: 'instability', message: 'intermittent drift', severity: 'warning' }]
+      }),
+      deepdebug: () => {
+        deepDebugCalls += 1;
+        return {
+          status: 'success',
+          summary: 'deepdebug invoked',
+          diagnosis: 'mock',
+          fix: 'mock',
+          regression_checks: [],
+          unknowns: []
+        };
+      }
+    }
+  });
+
+  assert.equal(escalated.answer_mode, 'escalated_answer');
+  assert.equal(deepDebugCalls, 1);
+  assert.equal(escalated.execution_plan.includes('deepdebug'), true);
+  assert.equal(escalated.dossier.self_improvement.telemetry.execution_plan.includes('deepdebug'), true);
+  console.log('ok - arbiter escalation appends deepdebug to plan + telemetry');
+
+  const classifiedWithModel = runtime.quickClassify('please review this motor CAN fault wiring', {
+    modelOutput: { intent: 'explain_or_review' }
+  });
+  assert.equal(classifiedWithModel.hints.safety_or_hardware, true);
+  assert.equal(classifiedWithModel.hints.explicit_review, true);
+  console.log('ok - model classifier output does not erase heuristic safety/review hints');
+
+  const nonFrcCanPhrase = runtime.quickClassify('can you summarize this novel for me');
+  assert.equal(nonFrcCanPhrase.intent, 'general_or_non_frc');
+  console.log('ok - non-FRC "can you" phrasing stays on general route');
+
   const general = runtime.orchestrateRequest({
     peerId: 'validate-peer-general',
     route: 'helpdesk',

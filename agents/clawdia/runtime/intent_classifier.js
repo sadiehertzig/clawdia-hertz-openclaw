@@ -69,7 +69,9 @@ const FRC_SIGNAL_PATTERNS = [
   'pathplanner',
   'roborio',
   'deploy',
-  'can',
+  'can bus',
+  'can id',
+  'canivore',
   'vision'
 ];
 
@@ -84,6 +86,17 @@ function safeJsonParse(value) {
 
 function includesAny(text, patterns) {
   return patterns.some((pattern) => text.includes(pattern));
+}
+
+function hasOwnKey(obj, key) {
+  return Object.prototype.hasOwnProperty.call(obj || {}, key);
+}
+
+function readOptionalBoolean(source, key) {
+  if (!hasOwnKey(source, key)) {
+    return undefined;
+  }
+  return Boolean(source[key]);
 }
 
 function detectRoutingHints(prompt) {
@@ -189,11 +202,14 @@ function parseModelClassifierOutput(modelOutput) {
     return null;
   }
 
+  const hintSource = parsed.hints && typeof parsed.hints === 'object'
+    ? parsed.hints
+    : parsed;
   const hints = {
-    is_follow_up: Boolean(parsed.is_follow_up),
-    follow_up_failure: Boolean(parsed.follow_up_failure),
-    safety_or_hardware: Boolean(parsed.safety_or_hardware),
-    explicit_review: Boolean(parsed.explicit_review)
+    is_follow_up: readOptionalBoolean(hintSource, 'is_follow_up'),
+    follow_up_failure: readOptionalBoolean(hintSource, 'follow_up_failure'),
+    safety_or_hardware: readOptionalBoolean(hintSource, 'safety_or_hardware'),
+    explicit_review: readOptionalBoolean(hintSource, 'explicit_review')
   };
 
   return {
@@ -213,8 +229,10 @@ function quickClassify(prompt, options) {
       intent: fromModel.intent,
       confidence: fromModel.confidence,
       hints: {
-        ...baseHints,
-        ...fromModel.hints
+        is_follow_up: fromModel.hints.is_follow_up ?? baseHints.is_follow_up,
+        follow_up_failure: fromModel.hints.follow_up_failure ?? baseHints.follow_up_failure,
+        safety_or_hardware: fromModel.hints.safety_or_hardware ?? baseHints.safety_or_hardware,
+        explicit_review: fromModel.hints.explicit_review ?? baseHints.explicit_review
       }
     };
   }
