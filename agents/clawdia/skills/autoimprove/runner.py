@@ -31,34 +31,41 @@ class ResponseRunner:
 
     async def run_one(self, skill_content: str, test_case: TestCase,
                       mode: str = "agent_simulation",
-                      model: str = DEFAULT_MODEL) -> dict:
+                      model: str = DEFAULT_MODEL,
+                      style_notes: str = "") -> dict:
         """Run a single test question."""
         if mode == "direct_invocation":
             return await self._run_direct(skill_content, test_case)
-        return await self._run_sim(skill_content, test_case, model)
+        return await self._run_sim(skill_content, test_case, model, style_notes)
 
     async def run_batch(self, skill_content: str, test_bank: list,
                         mode: str = "agent_simulation",
                         model: str = DEFAULT_MODEL,
-                        concurrency: int = 3) -> list:
+                        concurrency: int = 3,
+                        style_notes: str = "") -> list:
         """Run all test questions with bounded concurrency."""
         sem = asyncio.Semaphore(concurrency)
 
         async def bounded(tc):
             async with sem:
-                return await self.run_one(skill_content, tc, mode, model)
+                return await self.run_one(skill_content, tc, mode, model, style_notes)
 
         return await asyncio.gather(*[bounded(tc) for tc in test_bank])
 
-    async def _run_sim(self, skill_content: str, tc: TestCase, model: str) -> dict:
+    async def _run_sim(self, skill_content: str, tc: TestCase, model: str,
+                       style_notes: str = "") -> dict:
         if not self.anthropic_key:
             return self._err(tc, "No ANTHROPIC_API_KEY set")
+
+        style_instruction = ""
+        if style_notes:
+            style_instruction = f"\n\nResponse style: {style_notes}"
 
         system = (
             "You are an OpenClaw agent with this skill loaded:\n\n"
             f"{skill_content[:12000]}\n\n"
             "Answer the user's question using the knowledge and procedures "
-            "in this skill file. Be specific, concrete, and actionable."
+            f"in this skill file. Be specific, concrete, and actionable.{style_instruction}"
         )
 
         async with httpx.AsyncClient() as client:

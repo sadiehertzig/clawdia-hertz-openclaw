@@ -182,6 +182,12 @@ class AutoImproveConfig:
         for s in self.safety_rules:
             lines.append(f"- {s}")
 
+        if self.example_pairs:
+            lines += ["", "## Example Pairs"]
+            for ep in self.example_pairs:
+                lines.append(f"- Q: {ep.get('question', '')}")
+                lines.append(f"  A: {ep.get('answer', '')}")
+
         lines += [
             "",
             "## Grading",
@@ -257,6 +263,13 @@ class AutoImproveConfig:
                     config.constraints.append(item)
                 elif current_section == "safety rules":
                     config.safety_rules.append(item)
+                elif current_section == "example pairs" and item.startswith("Q: "):
+                    config.example_pairs.append({"question": item[3:], "answer": ""})
+
+            # Example pair answer lines (indented "A: ...")
+            if stripped.startswith("A: ") and current_section == "example pairs":
+                if config.example_pairs:
+                    config.example_pairs[-1]["answer"] = stripped[3:]
 
             # Numbered items (priorities)
             if current_section == "priorities" and stripped and stripped[0].isdigit():

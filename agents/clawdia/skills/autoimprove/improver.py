@@ -33,6 +33,12 @@ IMPROVEMENT PRIORITIES:
 
 AUDIENCE: {audience}
 
+CONSTRAINTS (the skill must avoid violating these):
+{constraints}
+
+SAFETY RULES (the skill must NEVER do these):
+{safety_rules}
+
 WORST-SCORING TEST QUESTIONS:
 {worst_questions}
 
@@ -46,6 +52,7 @@ RULES:
 - Do NOT delete or restructure existing content
 - Do NOT touch the YAML front matter or trigger phrases
 - Your edit must directly help at least one failing question
+- Your edit must NOT violate any constraint or safety rule listed above
 - content_to_add should be valid markdown, ready to insert as-is
 
 Return ONLY a JSON object (no markdown fences, no commentary):
@@ -72,6 +79,8 @@ class Improver:
             skill_content=skill_content[:8000],
             priorities="\n".join(f"- {p}" for p in config.priorities) or "None",
             audience=f"{config.audience} ({config.expertise_level})",
+            constraints="\n".join(f"- {c}" for c in config.constraints) or "None specified",
+            safety_rules="\n".join(f"- {s}" for s in config.safety_rules) or "None specified",
             worst_questions=json.dumps(worst_questions[:5], indent=2),
             edit_history=edit_history[-2000:] or "None yet.",
         )

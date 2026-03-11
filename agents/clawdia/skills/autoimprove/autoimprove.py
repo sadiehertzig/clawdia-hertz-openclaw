@@ -67,6 +67,16 @@ class AutoImprove:
         if self.verbose:
             print(msg, file=sys.stderr)
 
+    @staticmethod
+    def _enriched_summary(skill_content: str, config: AutoImproveConfig) -> str:
+        """Build a skill summary enriched with constraints/safety context."""
+        parts = [skill_content[:3500]]
+        if config.constraints:
+            parts.append("\nCONSTRAINTS: " + "; ".join(config.constraints))
+        if config.safety_rules:
+            parts.append("\nSAFETY RULES: " + "; ".join(config.safety_rules))
+        return "".join(parts)[:4000]
+
     # -- Persistence --
 
     def config_path(self): return self.target_dir / "program.md"
@@ -147,7 +157,8 @@ class AutoImprove:
         content = Path(config.skill_path).read_text()
 
         self._log(f"Baseline: {len(bank)} questions...")
-        responses = await self.runner.run_batch(content, bank, config.mode)
+        responses = await self.runner.run_batch(content, bank, config.mode,
+                                                style_notes=config.style_notes)
 
         self._log("Grading...")
         grader = Grader(verbose=self.verbose)
@@ -174,10 +185,15 @@ class AutoImprove:
         grader = Grader(verbose=False)
         iters = max_iters or config.max_iterations
 
+        if len(bank) < config.min_test_questions:
+            self._log(f"WARNING: Only {len(bank)} questions (minimum {config.min_test_questions}). "
+                       "Run 'generate' to add more.")
+
         self._log(f"Loop: {iters} iterations, {len(bank)} questions\n")
 
         # Baseline
-        responses = await self.runner.run_batch(skill_content, bank, config.mode)
+        responses = await self.runner.run_batch(skill_content, bank, config.mode,
+                                                style_notes=config.style_notes)
         verdicts = await grader.grade_batch(responses, skill_content[:3000], config)
         cur_scores = self.scorer.per_question_scores(verdicts)
         cur_verdicts = verdicts
@@ -225,7 +241,8 @@ class AutoImprove:
             modified = Path(config.skill_path).read_text()
 
             # Score
-            new_resp = await self.runner.run_batch(modified, bank, config.mode)
+            new_resp = await self.runner.run_batch(modified, bank, config.mode,
+                                                   style_notes=config.style_notes)
             new_verd = await grader.grade_batch(new_resp, modified[:3000], config)
             new_scores = self.scorer.per_question_scores(new_verd)
             new_agg = self.scorer.weighted_mean(new_scores, bank)
@@ -264,7 +281,8 @@ class AutoImprove:
                 if weak:
                     self._log(f"  Expanding {len(weak)} weak areas...")
                     gen = QuestionGenerator(verbose=False)
-                    new_tcs = await gen.channel_c(weak, skill_content[:4000])
+                    summary = self._enriched_summary(skill_content, config)
+                    new_tcs = await gen.channel_c(weak, summary)
                     bank.extend(new_tcs)
                     tc_map.update({tc.id: tc for tc in new_tcs})
                     self.save_bank(bank)
@@ -365,7 +383,9 @@ class AutoImprove:
                 if weak:
                     self._log(f"\nGenerating follow-up questions for {len(weak)} weak areas...")
                     gen = QuestionGenerator(verbose=False)
-                    new_tcs = await gen.channel_c(weak[:3], Path(working_path).read_text()[:4000])
+                    working_content = Path(working_path).read_text()
+                    summary = self._enriched_summary(working_content, config)
+                    new_tcs = await gen.channel_c(weak[:3], summary)
                     existing = {tc.id for tc in bank}
                     added = [tc for tc in new_tcs if tc.id not in existing]
                     bank.extend(added)
