@@ -1,0 +1,344 @@
+"""
+AutoImprove data models.
+No external dependencies — pure Python dataclasses.
+"""
+
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timezone
+from pathlib import Path
+import json
+
+
+# ─────────────────────────────────────────────────────────
+# Shared constants
+# ─────────────────────────────────────────────────────────
+
+DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+# ─────────────────────────────────────────────────────────
+# JSON parsing helpers (LLM output often has markdown fences)
+# ─────────────────────────────────────────────────────────
+
+def _strip_markdown_fences(text: str) -> str:
+    """Strip markdown code fences and optional 'json' language tag."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text.rsplit("```", 1)[0]
+    text = text.strip()
+    if text.startswith("json"):
+        text = text[4:].strip()
+    return text
+
+
+def parse_json_obj(text: str) -> dict | None:
+    """Extract a JSON object from model output. Returns dict or None."""
+    text = _strip_markdown_fences(text)
+    try:
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(text[start:end])
+    except json.JSONDecodeError:
+        pass
+    return None
+
+
+def parse_json_array(text: str) -> list:
+    """Extract a JSON array from model output. Returns list or []."""
+    text = _strip_markdown_fences(text)
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+    start = text.find("[")
+    end = text.rfind("]") + 1
+    if start >= 0 and end > start:
+        try:
+            return json.loads(text[start:end])
+        except json.JSONDecodeError:
+            pass
+    return []
+
+
+# ─────────────────────────────────────────────────────────
+# TestCase — a question used to evaluate a skill
+# ─────────────────────────────────────────────────────────
+
+@dataclass
+class TestCase:
+    """A single test question with assertions for grading."""
+    id: str
+    question: str
+    tier: str = "generated"                # curated | generated | candidate
+    source: str = "channel_a"              # channel_a | channel_b | channel_c | manual
+    created: str = ""
+    intent_class: str = ""
+    difficulty: str = "medium"             # easy | medium | hard | adversarial
+    key_assertions: list = field(default_factory=list)
+    anti_assertions: list = field(default_factory=list)
+    verified_answer_summary: str = ""
+    last_score: float = 0.0
+    score_history: list = field(default_factory=list)
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d):
+        valid_keys = cls.__dataclass_fields__.keys()
+        return cls(**{k: v for k, v in d.items() if k in valid_keys})
+
+
+# ─────────────────────────────────────────────────────────
+# Verdict — grading result from the Three-Body Council
+# ─────────────────────────────────────────────────────────
+
+@dataclass
+class Verdict:
+    """Structured grading result for one test question."""
+    test_id: str
+    grading_tier: str = "full_panel"       # full_panel | quick | prefilter_fail
+    assertion_results: list = field(default_factory=list)
+    anti_assertion_results: list = field(default_factory=list)
+    scores: dict = field(default_factory=dict)
+    composite_score: float = 0.0
+    flags: list = field(default_factory=list)
+    confidence: str = "MEDIUM"
+    summary: str = ""
+    transcript_path: str = ""
+
+    def to_dict(self):
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d):
+        valid_keys = cls.__dataclass_fields__.keys()
+        return cls(**{k: v for k, v in d.items() if k in valid_keys})
+
+    @property
+    def has_safety_flag(self):
+        return any("safety" in str(f).lower() for f in self.flags)
+
+
+# ─────────────────────────────────────────────────────────
+# Config — parsed from program.md
+# ─────────────────────────────────────────────────────────
+
+@dataclass
+class AutoImproveConfig:
+    """Configuration for an AutoImprove target, generated from the interview."""
+    target_skill: str = ""
+    skill_path: str = ""
+    repo_path: str = ""
+    mode: str = "agent_simulation"         # agent_simulation | direct_invocation
+    priorities: list = field(default_factory=list)
+    constraints: list = field(default_factory=list)
+    audience: str = ""
+    expertise_level: str = ""
+    style_notes: str = ""
+    safety_rules: list = field(default_factory=list)
+    example_pairs: list = field(default_factory=list)
+
+    # grading
+    grading_tier: str = "tiered"           # tiered | full_panel | quick_only
+    regression_threshold: float = 0.15
+    min_improvement: float = 0.01
+    min_test_questions: int = 15
+
+    # budget
+    max_iterations: int = 15
+    max_tokens: int = 500_000
+
+    def to_program_md(self) -> str:
+        """Serialize config to program.md format."""
+        lines = [
+            f"# AutoImprove \u2014 {self.target_skill} Program",
+            "",
+            "## Target",
+            f"skill_path: {self.skill_path}",
+            f"repo_path: {self.repo_path}",
+            f"mode: {self.mode}",
+            "",
+            "## Audience",
+            f"primary_users: {self.audience}",
+            f"expertise_level: {self.expertise_level}",
+            f"style: {self.style_notes}",
+            "",
+            "## Priorities",
+        ]
+        for i, p in enumerate(self.priorities, 1):
+            lines.append(f"{i}. {p}")
+
+        lines += ["", "## Constraints"]
+        for c in self.constraints:
+            lines.append(f"- {c}")
+
+        lines += ["", "## Safety Rules"]
+        for s in self.safety_rules:
+            lines.append(f"- {s}")
+
+        lines += [
+            "",
+            "## Grading",
+            f"grading_tier: {self.grading_tier}",
+            f"regression_threshold: {self.regression_threshold}",
+            f"min_improvement: {self.min_improvement}",
+            f"min_test_questions: {self.min_test_questions}",
+            "",
+            "## Budget",
+            f"max_iterations: {self.max_iterations}",
+            f"max_tokens: {self.max_tokens}",
+        ]
+        return "\n".join(lines)
+
+    def save(self, path: str):
+        Path(path).write_text(self.to_program_md())
+
+    @classmethod
+    def load(cls, path: str) -> "AutoImproveConfig":
+        """Parse a program.md back into config."""
+        config = cls()
+        text = Path(path).read_text()
+        current_section = None
+
+        for line in text.split("\n"):
+            stripped = line.strip()
+
+            # Track sections
+            if stripped.startswith("## "):
+                current_section = stripped[3:].strip().lower()
+                continue
+
+            # Key-value pairs
+            if ":" in stripped and not stripped.startswith("-") and not stripped.startswith("#"):
+                key, _, val = stripped.partition(":")
+                key = key.strip().lower()
+                val = val.strip()
+
+                if key == "skill_path":
+                    config.skill_path = val
+                elif key == "repo_path":
+                    config.repo_path = val
+                elif key == "mode":
+                    config.mode = val
+                elif key == "primary_users":
+                    config.audience = val
+                elif key == "expertise_level":
+                    config.expertise_level = val
+                elif key == "style":
+                    config.style_notes = val
+                elif key == "grading_tier":
+                    config.grading_tier = val
+                elif key == "regression_threshold":
+                    try: config.regression_threshold = float(val)
+                    except ValueError: pass
+                elif key == "min_improvement":
+                    try: config.min_improvement = float(val)
+                    except ValueError: pass
+                elif key == "min_test_questions":
+                    try: config.min_test_questions = int(val)
+                    except ValueError: pass
+                elif key == "max_iterations":
+                    try: config.max_iterations = int(val)
+                    except ValueError: pass
+                elif key == "max_tokens":
+                    try: config.max_tokens = int(val)
+                    except ValueError: pass
+
+            # List items
+            if stripped.startswith("- ") and current_section:
+                item = stripped[2:].strip()
+                if current_section == "constraints":
+                    config.constraints.append(item)
+                elif current_section == "safety rules":
+                    config.safety_rules.append(item)
+
+            # Numbered items (priorities)
+            if current_section == "priorities" and stripped and stripped[0].isdigit():
+                item = stripped.lstrip("0123456789.) ").strip()
+                if item:
+                    config.priorities.append(item)
+
+        # Extract name from header
+        for line in text.split("\n"):
+            if line.startswith("# AutoImprove"):
+                config.target_skill = (
+                    line.replace("# AutoImprove \u2014", "")
+                    .replace("# AutoImprove -", "")
+                    .replace("Program", "")
+                    .strip()
+                )
+                break
+
+        return config
+
+
+# ─────────────────────────────────────────────────────────
+# Test Bank persistence
+# ─────────────────────────────────────────────────────────
+
+def load_test_bank(path: str) -> list:
+    p = Path(path)
+    if not p.exists():
+        return []
+    data = json.loads(p.read_text())
+    return [TestCase.from_dict(d) for d in data]
+
+
+def save_test_bank(bank: list, path: str):
+    Path(path).write_text(json.dumps(
+        [tc.to_dict() for tc in bank], indent=2
+    ))
+
+
+# ─────────────────────────────────────────────────────────
+# Results Logger
+# ─────────────────────────────────────────────────────────
+
+class ResultsLogger:
+    """Append-only TSV log of improvement iterations."""
+
+    HEADER = (
+        "timestamp\tedit_description\taggregate_before\t"
+        "aggregate_after\tkept\treason\tworst_question\tworst_score\n"
+    )
+
+    def __init__(self, path: str):
+        self.path = Path(path)
+        if not self.path.exists():
+            self.path.write_text(self.HEADER)
+
+    def log(self, description, agg_before, agg_after, kept, reason,
+            worst_tid="", worst_score=0.0):
+        line = (
+            f"{datetime.now(timezone.utc).isoformat()}\t{description}\t"
+            f"{agg_before:.4f}\t{agg_after:.4f}\t{kept}\t{reason}\t"
+            f"{worst_tid}\t{worst_score:.4f}\n"
+        )
+        with open(self.path, "a") as f:
+            f.write(line)
+
+    def tail(self, n=10) -> str:
+        if not self.path.exists():
+            return ""
+        lines = self.path.read_text().strip().split("\n")
+        return "\n".join(lines[-n:])
+
+    def parse_entries(self) -> list:
+        if not self.path.exists():
+            return []
+        lines = self.path.read_text().strip().split("\n")
+        if len(lines) < 2:
+            return []
+        header = lines[0].split("\t")
+        entries = []
+        for line in lines[1:]:
+            parts = line.split("\t")
+            if len(parts) >= len(header):
+                entries.append(dict(zip(header, parts)))
+        return entries
