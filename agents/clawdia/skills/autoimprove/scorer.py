@@ -5,6 +5,7 @@ Git-based keep/discard for the improvement loop.
 """
 
 import subprocess
+from pathlib import Path
 from models import TestCase, Verdict, AutoImproveConfig
 
 
@@ -41,8 +42,18 @@ class Scorer:
 class Ratchet:
     """Git-based keep/discard logic for the improvement loop."""
 
-    def __init__(self, repo_path: str = ""):
+    def __init__(self, repo_path: str = "", skill_path: str = ""):
         self.repo_path = repo_path
+        self.skill_path = skill_path
+
+    def _rel_skill_path(self) -> str:
+        """Return the skill file path relative to the repo root."""
+        if not self.repo_path or not self.skill_path:
+            return ""
+        try:
+            return str(Path(self.skill_path).relative_to(self.repo_path))
+        except ValueError:
+            return self.skill_path
 
     def should_keep(self, before_scores: dict, after_scores: dict,
                     before_verdicts: list, after_verdicts: list,
@@ -93,12 +104,20 @@ class Ratchet:
 
     def commit(self, msg: str):
         if self.repo_path:
-            self._git("add", ".")
+            rel = self._rel_skill_path()
+            if rel:
+                self._git("add", rel)
+            else:
+                self._git("add", ".")
             self._git("commit", "-m", f"autoimprove: {msg}")
 
     def revert(self):
         if self.repo_path:
-            self._git("checkout", "--", ".")
+            rel = self._rel_skill_path()
+            if rel:
+                self._git("checkout", "--", rel)
+            else:
+                self._git("checkout", "--", ".")
 
     def push(self):
         if self.repo_path:

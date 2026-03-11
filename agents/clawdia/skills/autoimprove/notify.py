@@ -11,11 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-try:
-    import httpx
-except ImportError:
-    os.system(f"{sys.executable} -m pip install httpx --quiet --break-system-packages")
-    import httpx
+import httpx
 
 # Load config
 _OC_CONFIG = Path.home() / ".openclaw" / "openclaw.json"

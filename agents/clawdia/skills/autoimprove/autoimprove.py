@@ -247,7 +247,8 @@ class AutoImprove:
 
         self._log(f"Baseline: {len(bank)} questions...")
         responses = await self.runner.run_batch(content, bank, config.mode,
-                                                style_notes=config.style_notes)
+                                                style_notes=config.style_notes,
+                                                skill_path=config.skill_path)
         self._consume_component_usage("runner", self.runner)
 
         self._log("Grading...")
@@ -272,7 +273,7 @@ class AutoImprove:
         bank = self.load_bank()
         skill_content = Path(config.skill_path).read_text()
 
-        ratchet = Ratchet(config.repo_path)
+        ratchet = Ratchet(config.repo_path, config.skill_path)
         grader = Grader(verbose=False)
         iters = max_iters or config.max_iterations
 
@@ -284,7 +285,8 @@ class AutoImprove:
 
         # Baseline
         responses = await self.runner.run_batch(skill_content, bank, config.mode,
-                                                style_notes=config.style_notes)
+                                                style_notes=config.style_notes,
+                                                skill_path=config.skill_path)
         self._consume_component_usage("runner", self.runner)
         verdicts = await grader.grade_batch(responses, skill_content[:3000], config)
         self._consume_component_usage("grader", grader)
@@ -339,7 +341,8 @@ class AutoImprove:
 
             # Score
             new_resp = await self.runner.run_batch(modified, bank, config.mode,
-                                                   style_notes=config.style_notes)
+                                                   style_notes=config.style_notes,
+                                                   skill_path=config.skill_path)
             self._consume_component_usage("runner", self.runner)
             new_verd = await grader.grade_batch(new_resp, modified[:3000], config)
             self._consume_component_usage("grader", grader)
@@ -370,8 +373,8 @@ class AutoImprove:
                 consec_reverts += 1
                 self._log(f"  REVERTED ({reason})")
 
-            # Channel C every 5 iters
-            if i > 0 and i % 5 == 0:
+            # Channel C every 5 iters (triggers on iterations 5, 10, 15, ...)
+            if (i + 1) % 5 == 0:
                 weak = [
                     {"id": t, "question": tc_map.get(t, TestCase(id="", question="")).question,
                      "score": s, "summary": "low"}

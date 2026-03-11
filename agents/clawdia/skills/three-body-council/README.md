@@ -102,7 +102,10 @@ GEMINI_API_KEY=AI...
 
 ```bash
 clawhub install three-body-council
+pip install requests
 ```
+
+> **Note:** ClawHub installs the skill files only — Python dependencies must be installed separately.
 
 ## CLI Usage
 

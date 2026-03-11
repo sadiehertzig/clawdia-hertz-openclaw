@@ -43,9 +43,10 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 ### Requirements
 
 - Python 3.10+
-- `httpx` (`pip install httpx`)
+- `httpx` (`pip install httpx`) — used by AutoImprove for async API calls
+- `requests` (`pip install requests`) — used by Three-Body Council for sync API calls
 - `git` (for the ratchet mechanism)
-- [Three-Body Council](https://clawhub.ai/clawdia-hertz/three-body-council) skill installed
+- [Three-Body Council](https://clawhub.ai/clawdia-hertz/three-body-council) skill installed (required — AutoImprove uses it for grading)
 - At least 2 of 3 API keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`
 
 ### Optional: Telegram Approval
@@ -53,8 +54,8 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 AutoImprove can send proposed changes to Telegram for manual approval before committing. Set these in `~/.openclaw/openclaw.json` or as environment variables:
 
 ```
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
+OPENCLAW_TELEGRAM_BOT_TOKEN=...
+OPENCLAW_TELEGRAM_CHAT_ID=...
 ```
 
 Without Telegram configured, AutoImprove runs fully autonomously (ratchet still prevents regressions).
@@ -63,7 +64,11 @@ Without Telegram configured, AutoImprove runs fully autonomously (ratchet still 
 
 ```bash
 clawhub install autoimprove
+clawhub install three-body-council
+pip install httpx requests
 ```
+
+> **Note:** ClawHub installs skill files only — Python dependencies and required sibling skills must be installed separately. AutoImprove will not work without the Three-Body Council skill.
 
 ## Token usage tracking
 

@@ -30,11 +30,7 @@ if str(_TBC_PATH) not in sys.path:
 
 from three_body_council import ThreeBodyCouncil
 
-try:
-    import httpx
-except ImportError:
-    os.system(f"{sys.executable} -m pip install httpx --quiet --break-system-packages")
-    import httpx
+import httpx
 
 
 class Grader:

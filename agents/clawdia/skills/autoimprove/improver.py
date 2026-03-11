@@ -8,11 +8,7 @@ import os
 import sys
 from pathlib import Path
 
-try:
-    import httpx
-except ImportError:
-    os.system(f"{sys.executable} -m pip install httpx --quiet --break-system-packages")
-    import httpx
+import httpx
 
 from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_obj, empty_usage, add_usage
 
