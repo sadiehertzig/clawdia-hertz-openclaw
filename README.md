@@ -20,9 +20,11 @@ Self-improvement utilities:
 
 ```bash
 node scripts/validate-helpdesk-runtime.js
+node scripts/validate-three-body-council.js
 node scripts/validate-patternscout-improvements.js
 node scripts/helpdesk-nightly-digest.js
 node scripts/label-dossier-outcome.js <request_id> <worked|partially_worked|failed|unsafe>
 node scripts/patternscout-learn.js
 node scripts/patternscout-build-cards.js
+./scripts/preflight-three-body-council-release.sh
 ```

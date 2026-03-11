@@ -1,10 +1,10 @@
 ---
 name: three-body-council
 description: Multi-model deliberation panel that convenes Claude Opus 4.6, GPT-5.4, and Gemini 3.1 Pro for structured three-round debates
-homepage: https://github.com/clawdia-hertz/three-body-council
 metadata:
   version: "1.1.0"
   author: "clawdia-hertz"
+  homepage: "https://github.com/clawdia-hertz/three-body-council"
   tags: ["deliberation", "multi-model", "evaluation", "grading"]
 ---
 
@@ -81,5 +81,9 @@ Set these environment variables (or in `~/.openclaw/.env`):
 - `ANTHROPIC_API_KEY` — for Claude Opus 4.6
 - `OPENAI_API_KEY` — for GPT-5.4
 - `GEMINI_API_KEY` — for Gemini 3.1 Pro
+
+Python runtime dependency:
+
+- `requests` (`python3 -m pip install requests`)
 
 At least two keys are recommended for meaningful cross-examination.

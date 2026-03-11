@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls ~/.openclaw/*.json ~/.openclaw/.env)",
+      "Bash(set -a)",
+      "Bash(source ~/.openclaw/.env)",
+      "Bash(set +a)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3 autoimprove.py run --target quiz_me_test --iterations 2)",
+      "Bash(python3 autoimprove.py report --target quiz_me_test)",
+      "Bash(python3 autoimprove.py run --target quiz_me_test --iterations 3)",
+      "Bash(python3 autoimprove.py sweep --help)",
+      "Bash(python3 autoimprove.py sweep --target quiz_me_test --rounds 3 --iters 3)"
+    ]
+  }
+}

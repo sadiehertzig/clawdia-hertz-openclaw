@@ -96,7 +96,25 @@ function readOptionalBoolean(source, key) {
   if (!hasOwnKey(source, key)) {
     return undefined;
   }
-  return Boolean(source[key]);
+  const value = source[key];
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+    return undefined;
+  }
+
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+
+  return undefined;
 }
 
 function detectRoutingHints(prompt) {

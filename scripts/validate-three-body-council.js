@@ -197,9 +197,21 @@ function runClassifierRegressionChecks() {
   assert.equal(withModel.hints.safety_or_hardware, true);
   assert.equal(withModel.hints.explicit_review, true);
 
+  const withStringFalseHints = runtime.quickClassify('please review this motor CAN fault wiring', {
+    modelOutput: {
+      intent: 'explain_or_review',
+      hints: {
+        safety_or_hardware: 'false',
+        explicit_review: 'false'
+      }
+    }
+  });
+  assert.equal(withStringFalseHints.hints.safety_or_hardware, false);
+  assert.equal(withStringFalseHints.hints.explicit_review, false);
+
   const nonFrc = runtime.quickClassify('can you summarize this novel for me');
   assert.equal(nonFrc.intent, 'general_or_non_frc');
-  console.log('ok - classifier keeps heuristic hints and avoids false FRC routing for "can you" chat');
+  console.log('ok - classifier keeps heuristic hints, parses string booleans safely, and avoids false FRC routing for "can you" chat');
 }
 
 function run() {
