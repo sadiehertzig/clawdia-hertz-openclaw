@@ -14,7 +14,7 @@ except ImportError:
     os.system(f"{sys.executable} -m pip install httpx --quiet --break-system-packages")
     import httpx
 
-from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_obj
+from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_obj, empty_usage, add_usage
 
 
 IMPROVER_PROMPT = """\
@@ -65,6 +65,15 @@ class Improver:
 
     def __init__(self):
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
+        self.token_usage = empty_usage()
+
+    def _track_usage(self, raw_usage: dict | None):
+        add_usage(self.token_usage, raw_usage)
+
+    def consume_usage(self) -> dict:
+        usage = dict(self.token_usage)
+        self.token_usage = empty_usage()
+        return usage
 
     async def propose(self, skill_content: str, config: AutoImproveConfig,
                       worst_questions: list, edit_history: str = "") -> dict:
@@ -102,7 +111,9 @@ class Improver:
                     timeout=120.0,
                 )
                 resp.raise_for_status()
-                text = resp.json()["content"][0]["text"]
+                payload = resp.json()
+                self._track_usage(payload.get("usage"))
+                text = payload["content"][0]["text"]
                 return parse_json_obj(text)
         except Exception as e:
             print(f"Improver error: {e}", file=sys.stderr)

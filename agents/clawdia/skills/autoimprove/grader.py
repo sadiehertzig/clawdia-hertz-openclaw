@@ -14,7 +14,15 @@ import os
 import sys
 from pathlib import Path
 
-from models import TestCase, Verdict, AutoImproveConfig, DEFAULT_MODEL, parse_json_obj
+from models import (
+    TestCase,
+    Verdict,
+    AutoImproveConfig,
+    DEFAULT_MODEL,
+    parse_json_obj,
+    empty_usage,
+    add_usage,
+)
 
 _TBC_PATH = Path.home() / ".openclaw" / "skills" / "three-body-council"
 if str(_TBC_PATH) not in sys.path:
@@ -42,6 +50,15 @@ class Grader:
 
     def __init__(self, verbose=False):
         self.council = ThreeBodyCouncil(verbose=verbose)
+        self.token_usage = empty_usage()
+
+    def _track_usage(self, raw_usage: dict | None):
+        add_usage(self.token_usage, raw_usage)
+
+    def consume_usage(self) -> dict:
+        usage = dict(self.token_usage)
+        self.token_usage = empty_usage()
+        return usage
 
     async def grade_one(self, response_data: dict, skill_summary: str,
                         tier: str = "full_panel",
@@ -91,6 +108,7 @@ class Grader:
             key_assertions=key_a,
             anti_assertions=anti_a,
         )
+        self._track_usage(result.get("token_usage"))
 
         vd = result.get("verdict", {})
         return Verdict(
@@ -159,7 +177,9 @@ class Grader:
                     timeout=90.0,
                 )
                 resp.raise_for_status()
-                text = resp.json()["content"][0]["text"]
+                payload = resp.json()
+                self._track_usage(payload.get("usage"))
+                text = payload["content"][0]["text"]
 
             data = parse_json_obj(text) or {}
             scores = data.get("scores", {})

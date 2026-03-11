@@ -66,6 +66,54 @@ def parse_json_array(text: str) -> list:
 
 
 # ─────────────────────────────────────────────────────────
+# Token usage helpers
+# ─────────────────────────────────────────────────────────
+
+def _coerce_int(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def empty_usage() -> dict:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "calls": 0,
+    }
+
+
+def normalize_usage(raw_usage: dict | None) -> dict:
+    if not isinstance(raw_usage, dict):
+        return empty_usage()
+    inp = _coerce_int(raw_usage.get("input_tokens"))
+    out = _coerce_int(raw_usage.get("output_tokens"))
+    total = _coerce_int(raw_usage.get("total_tokens"))
+    calls = _coerce_int(raw_usage.get("calls"))
+    if total <= 0:
+        total = inp + out
+    return {
+        "input_tokens": max(0, inp),
+        "output_tokens": max(0, out),
+        "total_tokens": max(0, total),
+        "calls": max(0, calls),
+    }
+
+
+def add_usage(counter: dict, raw_usage: dict | None, calls_if_missing: bool = True) -> dict:
+    usage = normalize_usage(raw_usage)
+    if calls_if_missing and usage["calls"] == 0 and usage["total_tokens"] > 0:
+        usage["calls"] = 1
+    counter["input_tokens"] += usage["input_tokens"]
+    counter["output_tokens"] += usage["output_tokens"]
+    counter["total_tokens"] += usage["total_tokens"]
+    counter["calls"] += usage["calls"]
+    return counter
+
+
+# ─────────────────────────────────────────────────────────
 # TestCase — a question used to evaluate a skill
 # ─────────────────────────────────────────────────────────
 
@@ -152,7 +200,7 @@ class AutoImproveConfig:
 
     # budget
     max_iterations: int = 15
-    max_tokens: int = 500_000
+    token_budget: int = 1_000_000
 
     def to_program_md(self) -> str:
         """Serialize config to program.md format."""
@@ -198,7 +246,7 @@ class AutoImproveConfig:
             "",
             "## Budget",
             f"max_iterations: {self.max_iterations}",
-            f"max_tokens: {self.max_tokens}",
+            f"token_budget: {self.token_budget}",
         ]
         return "\n".join(lines)
 
@@ -252,8 +300,8 @@ class AutoImproveConfig:
                 elif key == "max_iterations":
                     try: config.max_iterations = int(val)
                     except ValueError: pass
-                elif key == "max_tokens":
-                    try: config.max_tokens = int(val)
+                elif key == "token_budget":
+                    try: config.token_budget = int(val)
                     except ValueError: pass
 
             # List items

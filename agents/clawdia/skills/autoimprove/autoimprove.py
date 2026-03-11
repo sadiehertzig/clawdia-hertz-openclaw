@@ -35,6 +35,7 @@ if _ENV_FILE.exists():
 from models import (
     TestCase, Verdict, AutoImproveConfig,
     ResultsLogger, load_test_bank, save_test_bank,
+    empty_usage, add_usage,
 )
 from interview import InterviewEngine
 from question_gen import QuestionGenerator
@@ -62,10 +63,97 @@ class AutoImprove:
         self.scorer = Scorer()
         self.improver = Improver()
         self.logger = ResultsLogger(str(self.target_dir / "results.tsv"))
+        self._usage_state = self._load_usage_state()
 
     def _log(self, msg):
         if self.verbose:
             print(msg, file=sys.stderr)
+
+    def usage_path(self):
+        return self.target_dir / "token_usage.json"
+
+    def _empty_usage_state(self) -> dict:
+        return {
+            "totals": empty_usage(),
+            "components": {},
+            "by_model": {},
+            "updated_at": None,
+        }
+
+    def _load_usage_state(self) -> dict:
+        path = self.usage_path()
+        state = self._empty_usage_state()
+        if not path.exists():
+            return state
+        try:
+            raw = json.loads(path.read_text())
+        except Exception:
+            return state
+
+        add_usage(state["totals"], raw.get("totals", {}), calls_if_missing=False)
+
+        for name, usage in raw.get("components", {}).items():
+            bucket = state["components"].setdefault(name, empty_usage())
+            add_usage(bucket, usage, calls_if_missing=False)
+
+        for model_key, usage in raw.get("by_model", {}).items():
+            row = {
+                "model_name": usage.get("model_name", model_key),
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "calls": 0,
+            }
+            add_usage(row, usage, calls_if_missing=False)
+            state["by_model"][model_key] = row
+
+        state["updated_at"] = raw.get("updated_at")
+        return state
+
+    def _save_usage_state(self):
+        self.usage_path().write_text(json.dumps(self._usage_state, indent=2))
+
+    def _track_usage(self, raw_usage: dict | None, component: str):
+        if not isinstance(raw_usage, dict):
+            return
+        add_usage(self._usage_state["totals"], raw_usage)
+        comp = self._usage_state["components"].setdefault(component, empty_usage())
+        add_usage(comp, raw_usage)
+
+        by_model = raw_usage.get("by_model", {})
+        if isinstance(by_model, dict):
+            for model_key, usage in by_model.items():
+                bucket = self._usage_state["by_model"].setdefault(
+                    model_key,
+                    {
+                        "model_name": usage.get("model_name", model_key),
+                        "input_tokens": 0,
+                        "output_tokens": 0,
+                        "total_tokens": 0,
+                        "calls": 0,
+                    },
+                )
+                add_usage(bucket, usage)
+
+        self._usage_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        self._save_usage_state()
+
+    def _consume_component_usage(self, component_name: str, component):
+        if not hasattr(component, "consume_usage"):
+            return
+        usage = component.consume_usage()
+        self._track_usage(usage, component_name)
+
+    def _over_budget(self, config) -> bool:
+        """Check if cumulative token usage exceeds the configured budget."""
+        budget = getattr(config, "token_budget", 0)
+        if budget <= 0:
+            return False
+        total = self._usage_state.get("totals", {}).get("total_tokens", 0)
+        if total >= budget:
+            self._log(f"TOKEN BUDGET EXCEEDED: {total:,} / {budget:,} tokens. Stopping.")
+            return True
+        return False
 
     @staticmethod
     def _enriched_summary(skill_content: str, config: AutoImproveConfig) -> str:
@@ -140,6 +228,7 @@ class AutoImprove:
         self._log("Convening Three-Body Council for test questions...")
         gen = QuestionGenerator(verbose=self.verbose)
         new_tcs = await gen.channel_a(content, config)
+        self._consume_component_usage("question_gen", gen)
 
         bank = self.load_bank()
         existing = {tc.id for tc in bank}
@@ -159,10 +248,12 @@ class AutoImprove:
         self._log(f"Baseline: {len(bank)} questions...")
         responses = await self.runner.run_batch(content, bank, config.mode,
                                                 style_notes=config.style_notes)
+        self._consume_component_usage("runner", self.runner)
 
         self._log("Grading...")
         grader = Grader(verbose=self.verbose)
         verdicts = await grader.grade_batch(responses, content[:3000], config)
+        self._consume_component_usage("grader", grader)
 
         scores = self.scorer.per_question_scores(verdicts)
         agg = self.scorer.weighted_mean(scores, bank)
@@ -194,7 +285,9 @@ class AutoImprove:
         # Baseline
         responses = await self.runner.run_batch(skill_content, bank, config.mode,
                                                 style_notes=config.style_notes)
+        self._consume_component_usage("runner", self.runner)
         verdicts = await grader.grade_batch(responses, skill_content[:3000], config)
+        self._consume_component_usage("grader", grader)
         cur_scores = self.scorer.per_question_scores(verdicts)
         cur_verdicts = verdicts
         cur_agg = self.scorer.weighted_mean(cur_scores, bank)
@@ -204,6 +297,9 @@ class AutoImprove:
         tc_map = {tc.id: tc for tc in bank}
 
         for i in range(iters):
+            if self._over_budget(config):
+                break
+
             self._log(f"-- Iter {i+1}/{iters} --")
 
             if consec_reverts >= 3:
@@ -226,6 +322,7 @@ class AutoImprove:
                 skill_content, config, worst_payload,
                 edit_history=self.logger.tail(10),
             )
+            self._consume_component_usage("improver", self.improver)
             if not edit:
                 self._log("  No edit proposed. Stopping.")
                 break
@@ -243,7 +340,9 @@ class AutoImprove:
             # Score
             new_resp = await self.runner.run_batch(modified, bank, config.mode,
                                                    style_notes=config.style_notes)
+            self._consume_component_usage("runner", self.runner)
             new_verd = await grader.grade_batch(new_resp, modified[:3000], config)
+            self._consume_component_usage("grader", grader)
             new_scores = self.scorer.per_question_scores(new_verd)
             new_agg = self.scorer.weighted_mean(new_scores, bank)
 
@@ -283,6 +382,7 @@ class AutoImprove:
                     gen = QuestionGenerator(verbose=False)
                     summary = self._enriched_summary(skill_content, config)
                     new_tcs = await gen.channel_c(weak, summary)
+                    self._consume_component_usage("question_gen", gen)
                     bank.extend(new_tcs)
                     tc_map.update({tc.id: tc for tc in new_tcs})
                     self.save_bank(bank)
@@ -346,6 +446,9 @@ class AutoImprove:
         baseline_agg = 0.0
 
         for round_num in range(1, max_rounds + 1):
+            if self._over_budget(config):
+                break
+
             self._log(f"=== Round {round_num}/{max_rounds} ===")
 
             result = await self.run_loop(max_iters=iters_per_round)
@@ -386,6 +489,7 @@ class AutoImprove:
                     working_content = Path(working_path).read_text()
                     summary = self._enriched_summary(working_content, config)
                     new_tcs = await gen.channel_c(weak[:3], summary)
+                    self._consume_component_usage("question_gen", gen)
                     existing = {tc.id for tc in bank}
                     added = [tc for tc in new_tcs if tc.id not in existing]
                     bank.extend(added)
@@ -433,10 +537,38 @@ class AutoImprove:
 
     # -- Report --
 
+    def _usage_report_lines(self) -> list[str]:
+        totals = self._usage_state.get("totals", empty_usage())
+        lines = [
+            "Token usage (cumulative):",
+            f"  input:  {totals.get('input_tokens', 0):,}",
+            f"  output: {totals.get('output_tokens', 0):,}",
+            f"  total:  {totals.get('total_tokens', 0):,}",
+            f"  calls:  {totals.get('calls', 0):,}",
+        ]
+
+        components = self._usage_state.get("components", {})
+        if components:
+            lines.append("")
+            lines.append("By component:")
+            for name, usage in sorted(
+                components.items(),
+                key=lambda kv: kv[1].get("total_tokens", 0),
+                reverse=True,
+            ):
+                lines.append(
+                    f"  {name}: total={usage.get('total_tokens', 0):,} "
+                    f"(in={usage.get('input_tokens', 0):,}, "
+                    f"out={usage.get('output_tokens', 0):,}, "
+                    f"calls={usage.get('calls', 0):,})"
+                )
+        return lines
+
     def report(self) -> str:
         entries = self.logger.parse_entries()
         if not entries:
-            return f"No results for {self.target_name}."
+            usage_lines = self._usage_report_lines()
+            return "\n".join([f"No results for {self.target_name}.", ""] + usage_lines)
 
         non_bl = [e for e in entries if e.get("edit_description") != "baseline"]
         kept = sum(1 for e in non_bl if e.get("kept") == "True")
@@ -460,6 +592,8 @@ class AutoImprove:
         for e in non_bl[-10:]:
             status = "KEPT" if e.get("kept") == "True" else f"REVERTED ({e.get('reason', '?')})"
             lines.append(f"  {e.get('edit_description', '?')} -> {status}")
+
+        lines += [""] + self._usage_report_lines()
 
         return "\n".join(lines)
 

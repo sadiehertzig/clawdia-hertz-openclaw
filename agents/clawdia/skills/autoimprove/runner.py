@@ -20,7 +20,7 @@ except ImportError:
     os.system(f"{sys.executable} -m pip install httpx --quiet --break-system-packages")
     import httpx
 
-from models import TestCase, DEFAULT_MODEL
+from models import TestCase, DEFAULT_MODEL, empty_usage, add_usage
 
 
 class ResponseRunner:
@@ -28,6 +28,15 @@ class ResponseRunner:
 
     def __init__(self):
         self.anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+        self.token_usage = empty_usage()
+
+    def _track_usage(self, raw_usage: dict | None):
+        add_usage(self.token_usage, raw_usage)
+
+    def consume_usage(self) -> dict:
+        usage = dict(self.token_usage)
+        self.token_usage = empty_usage()
+        return usage
 
     async def run_one(self, skill_content: str, test_case: TestCase,
                       mode: str = "agent_simulation",
@@ -86,7 +95,9 @@ class ResponseRunner:
                     timeout=120.0,
                 )
                 resp.raise_for_status()
-                text = resp.json()["content"][0]["text"]
+                payload = resp.json()
+                self._track_usage(payload.get("usage"))
+                text = payload["content"][0]["text"]
                 return {
                     "test_id": tc.id,
                     "question": tc.question,
@@ -96,6 +107,7 @@ class ResponseRunner:
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "model": model,
                     "mode": "agent_simulation",
+                    "token_usage": payload.get("usage", {}),
                     "error": False,
                 }
             except Exception as e:
@@ -120,7 +132,9 @@ class ResponseRunner:
                 "key_assertions": tc.key_assertions,
                 "anti_assertions": tc.anti_assertions,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "mode": "direct_invocation", "error": False,
+                "mode": "direct_invocation",
+                "token_usage": {},
+                "error": False,
             }
         except Exception as e:
             return self._err(tc, str(e))
@@ -132,5 +146,7 @@ class ResponseRunner:
             "key_assertions": tc.key_assertions,
             "anti_assertions": tc.anti_assertions,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "mode": "error", "error": True,
+            "mode": "error",
+            "token_usage": {},
+            "error": True,
         }

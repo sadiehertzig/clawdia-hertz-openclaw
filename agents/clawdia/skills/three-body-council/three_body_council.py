@@ -12,10 +12,12 @@ Usage:
 """
 
 import asyncio
+import copy
 import json
 import os
 import re
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -277,8 +279,58 @@ Return ONLY a JSON object (no markdown fences, no preamble):
 # API CALLERS (synchronous, using requests)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _coerce_int(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _zero_usage() -> dict:
+    return {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "calls": 0,
+    }
+
+
+def _normalize_usage(raw_usage: dict | None) -> dict:
+    if not isinstance(raw_usage, dict):
+        return _zero_usage()
+    inp = _coerce_int(raw_usage.get("input_tokens"))
+    out = _coerce_int(raw_usage.get("output_tokens"))
+    total = _coerce_int(raw_usage.get("total_tokens"))
+    calls = _coerce_int(raw_usage.get("calls"))
+    if total <= 0:
+        total = inp + out
+    return {
+        "input_tokens": max(0, inp),
+        "output_tokens": max(0, out),
+        "total_tokens": max(0, total),
+        "calls": max(0, calls),
+    }
+
+
+def _extract_anthropic_usage(data: dict) -> dict:
+    usage = data.get("usage", {}) if isinstance(data, dict) else {}
+    inp = (
+        _coerce_int(usage.get("input_tokens"))
+        + _coerce_int(usage.get("cache_creation_input_tokens"))
+        + _coerce_int(usage.get("cache_read_input_tokens"))
+    )
+    out = _coerce_int(usage.get("output_tokens"))
+    total = _coerce_int(usage.get("total_tokens")) or (inp + out)
+    return {
+        "input_tokens": inp,
+        "output_tokens": out,
+        "total_tokens": total,
+        "calls": 1,
+    }
+
+
 def _call_anthropic_sync(api_key: str, model_id: str,
-                         system: str, user_msg: str) -> str:
+                         system: str, user_msg: str) -> tuple[str, dict]:
     """Call Anthropic Messages API."""
     resp = requests.post(
         "https://api.anthropic.com/v1/messages",
@@ -297,7 +349,7 @@ def _call_anthropic_sync(api_key: str, model_id: str,
     )
     resp.raise_for_status()
     data = resp.json()
-    return data["content"][0]["text"]
+    return data["content"][0]["text"], _extract_anthropic_usage(data)
 
 
 def _http_error_details(resp: requests.Response) -> str:
@@ -375,8 +427,34 @@ def _extract_openai_chat_text(data: dict) -> str:
     raise RuntimeError("OpenAI chat payload missing message content")
 
 
+def _extract_openai_responses_usage(data: dict) -> dict:
+    usage = data.get("usage", {}) if isinstance(data, dict) else {}
+    inp = _coerce_int(usage.get("input_tokens"))
+    out = _coerce_int(usage.get("output_tokens"))
+    total = _coerce_int(usage.get("total_tokens")) or (inp + out)
+    return {
+        "input_tokens": inp,
+        "output_tokens": out,
+        "total_tokens": total,
+        "calls": 1,
+    }
+
+
+def _extract_openai_chat_usage(data: dict) -> dict:
+    usage = data.get("usage", {}) if isinstance(data, dict) else {}
+    inp = _coerce_int(usage.get("prompt_tokens"))
+    out = _coerce_int(usage.get("completion_tokens"))
+    total = _coerce_int(usage.get("total_tokens")) or (inp + out)
+    return {
+        "input_tokens": inp,
+        "output_tokens": out,
+        "total_tokens": total,
+        "calls": 1,
+    }
+
+
 def _call_openai_sync(api_key: str, model_id: str,
-                      system: str, user_msg: str) -> str:
+                      system: str, user_msg: str) -> tuple[str, dict]:
     """Call OpenAI API (Responses first, Chat Completions fallback)."""
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -398,7 +476,8 @@ def _call_openai_sync(api_key: str, model_id: str,
             timeout=120,
         )
         if resp.ok:
-            return _extract_openai_responses_text(resp.json())
+            payload = resp.json()
+            return _extract_openai_responses_text(payload), _extract_openai_responses_usage(payload)
         errors.append(f"responses={_http_error_details(resp)}")
     except Exception as e:
         errors.append(f"responses_exception={e}")
@@ -419,7 +498,8 @@ def _call_openai_sync(api_key: str, model_id: str,
             timeout=120,
         )
         if resp.ok:
-            return _extract_openai_chat_text(resp.json())
+            payload = resp.json()
+            return _extract_openai_chat_text(payload), _extract_openai_chat_usage(payload)
         errors.append(f"chat_completions={_http_error_details(resp)}")
     except Exception as e:
         errors.append(f"chat_completions_exception={e}")
@@ -427,8 +507,21 @@ def _call_openai_sync(api_key: str, model_id: str,
     raise RuntimeError("OpenAI request failed: " + " | ".join(errors))
 
 
+def _extract_google_usage(data: dict) -> dict:
+    usage = data.get("usageMetadata", {}) if isinstance(data, dict) else {}
+    inp = _coerce_int(usage.get("promptTokenCount"))
+    out = _coerce_int(usage.get("candidatesTokenCount"))
+    total = _coerce_int(usage.get("totalTokenCount")) or (inp + out)
+    return {
+        "input_tokens": inp,
+        "output_tokens": out,
+        "total_tokens": total,
+        "calls": 1,
+    }
+
+
 def _call_google_sync(api_key: str, model_id: str,
-                      system: str, user_msg: str) -> str:
+                      system: str, user_msg: str) -> tuple[str, dict]:
     """Call Google Gemini API."""
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{model_id}:generateContent")
@@ -447,7 +540,7 @@ def _call_google_sync(api_key: str, model_id: str,
     )
     resp.raise_for_status()
     data = resp.json()
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+    return data["candidates"][0]["content"]["parts"][0]["text"], _extract_google_usage(data)
 
 
 API_CALLERS = {
@@ -484,6 +577,8 @@ class ThreeBodyCouncil:
         self.verbose = verbose
         self.synthesizer = synthesizer
         self.api_keys = {}
+        self._token_lock = threading.Lock()
+        self._token_counter = self._empty_counter()
 
         # Load API keys from environment or .env
         self._load_env()
@@ -495,6 +590,68 @@ class ThreeBodyCouncil:
         if verbose:
             available = [MODELS[k].name for k in self.api_keys]
             self._log(f"Three-Body Council initialized. Models available: {available}")
+
+    @staticmethod
+    def _empty_counter() -> dict:
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "calls": 0,
+            "by_model": {},
+        }
+
+    def _record_usage(self, model_key: str, raw_usage: dict | None):
+        usage = _normalize_usage(raw_usage)
+        if usage["calls"] == 0 and usage["total_tokens"] > 0:
+            usage["calls"] = 1
+        if usage["total_tokens"] == 0 and usage["calls"] == 0:
+            return
+        with self._token_lock:
+            for field in ("input_tokens", "output_tokens", "total_tokens", "calls"):
+                self._token_counter[field] += usage[field]
+
+            model_counter = self._token_counter["by_model"].setdefault(
+                model_key,
+                {
+                    "model_name": MODELS.get(model_key).name if model_key in MODELS else model_key,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "calls": 0,
+                },
+            )
+            for field in ("input_tokens", "output_tokens", "total_tokens", "calls"):
+                model_counter[field] += usage[field]
+
+    def get_token_counter(self) -> dict:
+        with self._token_lock:
+            return copy.deepcopy(self._token_counter)
+
+    @classmethod
+    def _counter_delta(cls, before: dict, after: dict) -> dict:
+        delta = cls._empty_counter()
+        for field in ("input_tokens", "output_tokens", "total_tokens", "calls"):
+            delta[field] = max(0, _coerce_int(after.get(field)) - _coerce_int(before.get(field)))
+
+        before_models = before.get("by_model", {}) if isinstance(before, dict) else {}
+        after_models = after.get("by_model", {}) if isinstance(after, dict) else {}
+        for model_key, after_row in after_models.items():
+            before_row = before_models.get(model_key, {})
+            row = {
+                "model_name": after_row.get("model_name", model_key),
+                "input_tokens": max(0, _coerce_int(after_row.get("input_tokens")) - _coerce_int(before_row.get("input_tokens"))),
+                "output_tokens": max(0, _coerce_int(after_row.get("output_tokens")) - _coerce_int(before_row.get("output_tokens"))),
+                "total_tokens": max(0, _coerce_int(after_row.get("total_tokens")) - _coerce_int(before_row.get("total_tokens"))),
+                "calls": max(0, _coerce_int(after_row.get("calls")) - _coerce_int(before_row.get("calls"))),
+            }
+            if row["total_tokens"] > 0 or row["calls"] > 0:
+                delta["by_model"][model_key] = row
+        return delta
+
+    def _usage_payload(self, before_counter: dict) -> tuple[dict, dict]:
+        after_counter = self.get_token_counter()
+        return self._counter_delta(before_counter, after_counter), after_counter
 
     def _load_env(self):
         """Load .env file if API keys not already in environment."""
@@ -525,7 +682,12 @@ class ThreeBodyCouncil:
         caller = API_CALLERS[cfg.provider]
         self._log(f"  -> Calling {cfg.name}...")
         try:
-            result = caller(api_key, cfg.model_id, system, user_msg)
+            call_result = caller(api_key, cfg.model_id, system, user_msg)
+            if isinstance(call_result, tuple) and len(call_result) == 2:
+                result, usage = call_result
+            else:
+                result, usage = call_result, _zero_usage()
+            self._record_usage(key, usage)
             self._log(f"  OK {cfg.name} responded ({len(result)} chars)")
             return result
         except Exception as e:
@@ -581,6 +743,7 @@ class ThreeBodyCouncil:
         self._log(f"{'='*60}")
 
         t_start = time.time()
+        usage_before = self.get_token_counter()
 
         # ── Round 1: Independent analysis ──
         self._log("\n--- ROUND 1: Independent Analysis ---")
@@ -609,6 +772,7 @@ class ThreeBodyCouncil:
             self._log("  WARNING: <2 models responded, returning best available")
             single = next(iter(active_r1.values()), "No models responded.")
             elapsed = time.time() - t_start
+            token_usage, token_counter = self._usage_payload(usage_before)
             return {
                 "question": question,
                 "round1": r1_results,
@@ -616,6 +780,8 @@ class ThreeBodyCouncil:
                 "synthesis": single,
                 "elapsed_seconds": round(elapsed, 1),
                 "models_participated": [MODELS[k].name for k in active_r1],
+                "token_usage": token_usage,
+                "token_counter": token_counter,
             }
 
         # ── Round 2: Cross-examination ──
@@ -677,6 +843,7 @@ class ThreeBodyCouncil:
         self._log(f"  DELIBERATION COMPLETE ({elapsed:.1f}s)")
         self._log(f"{'='*60}\n")
 
+        token_usage, token_counter = self._usage_payload(usage_before)
         return {
             "question": question,
             "round1": r1_results,
@@ -686,6 +853,8 @@ class ThreeBodyCouncil:
             "models_participated": [
                 MODELS[k].name for k, v in r1_results.items() if v is not None
             ],
+            "token_usage": token_usage,
+            "token_counter": token_counter,
         }
 
     def convene(self, question: str) -> dict:
@@ -696,6 +865,7 @@ class ThreeBodyCouncil:
         self._log(f"{'='*60}")
 
         t_start = time.time()
+        usage_before = self.get_token_counter()
 
         # ── Round 1: Independent analysis ──
         self._log("\n--- ROUND 1: Independent Analysis ---")
@@ -716,6 +886,7 @@ class ThreeBodyCouncil:
             self._log("  WARNING: <2 models responded, returning best available")
             single = next(iter(active_r1.values()), "No models responded.")
             elapsed = time.time() - t_start
+            token_usage, token_counter = self._usage_payload(usage_before)
             return {
                 "question": question,
                 "round1": r1_results,
@@ -723,6 +894,8 @@ class ThreeBodyCouncil:
                 "synthesis": single,
                 "elapsed_seconds": round(elapsed, 1),
                 "models_participated": [MODELS[k].name for k in active_r1],
+                "token_usage": token_usage,
+                "token_counter": token_counter,
             }
 
         # ── Round 2: Cross-examination ──
@@ -776,6 +949,7 @@ class ThreeBodyCouncil:
         self._log(f"  DELIBERATION COMPLETE ({elapsed:.1f}s)")
         self._log(f"{'='*60}\n")
 
+        token_usage, token_counter = self._usage_payload(usage_before)
         return {
             "question": question,
             "round1": r1_results,
@@ -785,6 +959,8 @@ class ThreeBodyCouncil:
             "models_participated": [
                 MODELS[k].name for k, v in r1_results.items() if v is not None
             ],
+            "token_usage": token_usage,
+            "token_counter": token_counter,
         }
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -828,6 +1004,7 @@ class ThreeBodyCouncil:
         self._log(f"{'='*60}")
 
         t_start = time.time()
+        usage_before = self.get_token_counter()
 
         assertions_str = _json.dumps(key_assertions, indent=2) if key_assertions else "None specified"
         anti_str = _json.dumps(anti_assertions, indent=2) if anti_assertions else "None specified"
@@ -863,6 +1040,7 @@ class ThreeBodyCouncil:
             single_eval = next(iter(active_r1.values()), "{}")
             verdict = self._parse_eval_json(single_eval)
             elapsed = time.time() - t_start
+            token_usage, token_counter = self._usage_payload(usage_before)
             return {
                 "question": question,
                 "response": response,
@@ -874,6 +1052,8 @@ class ThreeBodyCouncil:
                 "models_participated": [
                     MODELS[k].name for k in active_r1
                 ],
+                "token_usage": token_usage,
+                "token_counter": token_counter,
             }
 
         # ── Round 2: Cross-examination of evaluations ──
@@ -937,6 +1117,7 @@ class ThreeBodyCouncil:
         self._log(f"  EVALUATION COMPLETE ({elapsed:.1f}s) — Score: {verdict.get('composite_score', 'N/A')}")
         self._log(f"{'='*60}\n")
 
+        token_usage, token_counter = self._usage_payload(usage_before)
         return {
             "question": question,
             "response": response,
@@ -948,6 +1129,8 @@ class ThreeBodyCouncil:
             "models_participated": [
                 MODELS[k].name for k, v in r1_results.items() if v is not None
             ],
+            "token_usage": token_usage,
+            "token_counter": token_counter,
         }
 
     def evaluate(self, question, response, skill_summary="",

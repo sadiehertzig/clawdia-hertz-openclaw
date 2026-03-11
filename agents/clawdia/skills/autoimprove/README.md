@@ -65,6 +65,39 @@ Without Telegram configured, AutoImprove runs fully autonomously (ratchet still 
 clawhub install autoimprove
 ```
 
+## Token usage tracking
+
+AutoImprove tracks every API call and persists cumulative token usage to `token_usage.json` per target skill. The report includes a breakdown by component (runner, grader, improver, question_gen) and by model (Claude, GPT, Gemini).
+
+AutoImprove enforces a **token budget** (default: 1,000,000 tokens, ~$15-75 depending on input/output mix). When cumulative usage hits the budget, the current loop and sweep halt gracefully. You can adjust this in your `program.md`:
+
+```
+token_budget: 2000000
+```
+
+Set `token_budget: 0` to disable the limit entirely (not recommended for unattended runs).
+
+Depending on the size of your test bank and grading tier, costs per iteration vary:
+
+| Grading tier | Approximate cost per question |
+|-------------|------------------------------|
+| `quick_only` | ~$0.02 (single Sonnet call) |
+| `tiered` | ~$0.02-0.20 (quick first, escalates ambiguous) |
+| `full_panel` | ~$0.20 (full Three-Body Council, 3 models x 3 rounds) |
+
+A typical 20-question test bank with `tiered` grading runs **~$1-4 per iteration**. A full sweep (10 rounds x 5 iterations) could cost **$50-200** depending on convergence speed.
+
+### Controlling costs
+
+- **`token_budget`** in your program.md — hard cap on total tokens consumed (default: 1,000,000). The loop stops when this is hit.
+- **`max_iterations`** in your program.md — caps the number of edit-score cycles per run (default: 15)
+- **`grading_tier: quick_only`** — use single-model grading during development, switch to `tiered` or `full_panel` for final passes
+- **Smaller test banks** — start with 15-20 questions; Channel C will expand coverage where needed
+- **Monitor `token_usage.json`** — check cumulative spend between runs and adjust strategy
+- **`autoimprove pause [skill]`** — stop nightly runs if costs are climbing faster than scores
+
+The usage report at the end of each run shows exactly where tokens went, so you can spot if one component (usually the grader) is dominating spend and adjust accordingly.
+
 ## Architecture
 
 ```

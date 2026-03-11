@@ -13,7 +13,13 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from models import TestCase, AutoImproveConfig, parse_json_array
+from models import (
+    TestCase,
+    AutoImproveConfig,
+    parse_json_array,
+    empty_usage,
+    add_usage,
+)
 
 # Import Three-Body Council
 _TBC_PATH = Path.home() / ".openclaw" / "skills" / "three-body-council"
@@ -84,6 +90,15 @@ class QuestionGenerator:
 
     def __init__(self, verbose=False):
         self.council = ThreeBodyCouncil(verbose=verbose)
+        self.token_usage = empty_usage()
+
+    def _track_usage(self, raw_usage: dict | None):
+        add_usage(self.token_usage, raw_usage)
+
+    def consume_usage(self) -> dict:
+        usage = dict(self.token_usage)
+        self.token_usage = empty_usage()
+        return usage
 
     async def channel_a(self, skill_content: str, config: AutoImproveConfig) -> list:
         """Channel A: Generate questions from the skill file."""
@@ -101,6 +116,7 @@ class QuestionGenerator:
         )
 
         result = await self.council.convene_async(prompt)
+        self._track_usage(result.get("token_usage"))
         raw = result.get("synthesis", result.get("final_answer", ""))
         questions = parse_json_array(raw)
 
@@ -135,6 +151,7 @@ class QuestionGenerator:
             )
 
             result = await self.council.convene_async(prompt)
+            self._track_usage(result.get("token_usage"))
             questions = parse_json_array(result.get("synthesis", result.get("final_answer", "")))
 
             for i, q in enumerate(questions):
