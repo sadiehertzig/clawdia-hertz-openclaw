@@ -1,31 +1,19 @@
-# Codex Workflow
+# Clawdia Hertz — OpenClaw
 
-This repository contains the GatorBots help desk runtime integration.
+This is my personal AI assistant project. I'm Sadie, and I'm learning coding and AI skills by building things hands-on. This whole repo is me figuring things out as I go.
 
-Run planning only:
+**Clawdia** is my AI assistant, built on [OpenClaw](https://github.com/openclaw). She helps me learn, answers questions, and is slowly becoming the backbone of what I'm really trying to build: the most epic **FRC GatorBots help desk** ever.
 
-```bash
-./scripts/codex-plan.sh docs/audits/test_task.md
-```
+## What's in here
 
-Run plan + implementation:
+- **Clawdia** (`agents/clawdia/`) — My primary AI agent with a growing collection of skills
+- **Arbiter** (`agents/arbiter/`) — An FRC robotics coding assistant with reference docs for WPILib, PathPlanner, REV Spark, CTRE Phoenix6, and deploy checklists
+- **Skills** (`agents/clawdia/skills/`) — Modular capabilities like quiz generation, essay coaching, FRC code generation, trivia, research assistance, and a self-improving skill loop
 
-```bash
-./scripts/codex-implement.sh docs/audits/test_task.md
-```
-
-`scripts/codex-implement.sh` now creates a runtime dossier at start and updates it again with the run result.
-
-Self-improvement utilities:
+## Scripts
 
 ```bash
-./scripts/secret-scan.sh
-node scripts/validate-helpdesk-runtime.js
-node scripts/validate-three-body-council.js
-node scripts/validate-patternscout-improvements.js
-node scripts/helpdesk-nightly-digest.js
-node scripts/label-dossier-outcome.js <request_id> <worked|partially_worked|failed|unsafe>
-node scripts/patternscout-learn.js
-node scripts/patternscout-build-cards.js
-./scripts/preflight-three-body-council-release.sh
+./scripts/codex-plan.sh docs/audits/test_task.md       # Run planning only
+./scripts/codex-implement.sh docs/audits/test_task.md   # Run plan + implementation
+./scripts/secret-scan.sh                                # Check for leaked secrets
 ```

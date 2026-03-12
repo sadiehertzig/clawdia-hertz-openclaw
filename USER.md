@@ -1,17 +1,12 @@
 # USER.md - About Your Human
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
+- **Name:** Sadie
+- **What to call them:** Sadie
+- **Notes:** Builder of this whole thing. Learning coding and AI by doing, not by reading textbooks.
 
 ## Context
 
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+- FRC GatorBots team member — building the most epic help desk for the team
+- Learning to code and work with AI tools hands-on
+- Publishes skills to ClawHub
+- Cares about making tools accessible (see: college-app-essay-coach)

@@ -2,7 +2,7 @@
 
 An open-source OpenClaw skill that coaches students through college application essays without writing a single word for them.
 
-Built by [Sadie Hertzig](https://github.com/sadiehertzig) -- a high school student applying the same process to her own applications.
+Built by [Sadie Hertzig](https://github.com/sadiehertzig).
 
 ## What It Does
 
