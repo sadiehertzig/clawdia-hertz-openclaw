@@ -195,7 +195,7 @@ class AutoImproveConfig:
     target_skill: str = ""
     skill_path: str = ""
     repo_path: str = ""
-    mode: str = "agent_simulation"         # agent_simulation | direct_invocation
+    mode: str = "agent_simulation"         # agent_simulation | tool_simulation | direct_invocation
     priorities: list = field(default_factory=list)
     constraints: list = field(default_factory=list)
     audience: str = ""

@@ -280,6 +280,10 @@ class AutoImprove:
 
         engine = InterviewEngine(name, content, skill_path)
 
+        self._log("Analyzing skill for improvement suggestions...")
+        await engine.run_pre_analysis()
+        self._consume_component_usage("interview", engine)
+
         while not engine.is_complete():
             prompt = engine.get_next_prompt()
             if not prompt:

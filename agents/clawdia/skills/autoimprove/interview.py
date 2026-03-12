@@ -4,6 +4,7 @@ Conversational onboarding to extract what "better" means for a skill.
 
 Usage:
     engine = InterviewEngine(skill_name, skill_content, skill_path)
+    await engine.run_pre_analysis()   # optional — proposes top 3 fixes
     while not engine.is_complete():
         prompt = engine.get_next_prompt()
         # ... send to user, get response ...
@@ -11,7 +12,12 @@ Usage:
     config = engine.build_config()
 """
 
-from models import AutoImproveConfig
+import json
+import os
+
+import httpx
+
+from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_array, empty_usage, add_usage
 
 
 class InterviewEngine:
@@ -19,12 +25,8 @@ class InterviewEngine:
 
     STEPS = [
         {
-            "id": "confirm_skill",
-            "prompt": (
-                "I've read the **{skill_name}** skill ({char_count} characters). "
-                "It {skill_summary}. Is this the right one, and is there anything "
-                "else I should read before we start?"
-            ),
+            "id": "pre_analysis",
+            "prompt": None,  # dynamically generated from analysis results
         },
         {
             "id": "whats_wrong",
@@ -73,6 +75,16 @@ class InterviewEngine:
         self.step_index = 0
         self.responses = {}
         self.example_pairs = []
+        self._analysis_results = []
+        self.token_usage = empty_usage()
+
+    def _track_usage(self, raw_usage: dict | None):
+        add_usage(self.token_usage, raw_usage)
+
+    def consume_usage(self) -> dict:
+        usage = dict(self.token_usage)
+        self.token_usage = empty_usage()
+        return usage
 
     def is_complete(self) -> bool:
         return self.step_index >= len(self.STEPS)
@@ -88,6 +100,31 @@ class InterviewEngine:
             return ""
 
         step = self.STEPS[self.step_index]
+
+        if step["id"] == "pre_analysis":
+            if not self._analysis_results:
+                return (
+                    f"I've read the **{self.skill_name}** skill "
+                    f"({len(self.skill_content)} characters). "
+                    f"It {self._one_line_summary()}.\n\n"
+                    "What's bothering you about it? Specific failures, "
+                    "general quality issues, complaints — anything."
+                )
+            lines = [
+                f"I've analyzed **{self.skill_name}** "
+                f"({len(self.skill_content)} characters) and here are "
+                f"my top 3 suggested fixes:\n"
+            ]
+            for i, fix in enumerate(self._analysis_results, 1):
+                lines.append(
+                    f"**{i}. {fix.get('title', 'Untitled')}** "
+                    f"({fix.get('priority', 'medium')} priority)"
+                )
+                lines.append(f"   {fix.get('description', '')}\n")
+            lines.append(
+                "Do any of these resonate? What else is bothering you?"
+            )
+            return "\n".join(lines)
 
         if step["id"] == "confirm_program":
             config = self._build_config_internal()
@@ -143,13 +180,69 @@ class InterviewEngine:
         """Return any Q&A pairs the user provided during ideal_answer step."""
         return self.example_pairs
 
+    # ── Pre-analysis ──
+
+    async def run_pre_analysis(self):
+        """Single model call to propose top 3 improvements. Call before the loop."""
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            return
+
+        prompt = (
+            "Analyze this OpenClaw skill file and identify the top 3 "
+            "improvements that would most increase its quality for real users.\n\n"
+            f"SKILL FILE:\n---\n{self.skill_content[:6000]}\n---\n\n"
+            "Look for: gaps in coverage, missing edge cases, vagueness, "
+            "missing examples, safety gaps, audience mismatch, structural "
+            "issues, or tool usage problems.\n\n"
+            "For each improvement, provide:\n"
+            "- title: Short label (5-10 words)\n"
+            "- description: What's wrong and how to fix it (1-2 sentences)\n"
+            "- priority: high, medium, or low\n\n"
+            "Return ONLY a JSON array:\n"
+            '[{"title":"...","description":"...","priority":"..."},...]'
+        )
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": DEFAULT_MODEL,
+                        "max_tokens": 512,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                    timeout=60.0,
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+                self._track_usage(payload.get("usage"))
+                text = payload["content"][0]["text"]
+
+            items = parse_json_array(text)
+            self._analysis_results = items[:3]
+        except Exception:
+            self._analysis_results = []
+
     # ── Internals ──
 
     def _build_config_internal(self) -> AutoImproveConfig:
+        # Auto-detect tool skills
+        has_tools = (
+            "web_search" in self.skill_content
+            or "web_fetch" in self.skill_content
+        )
+        mode = "tool_simulation" if has_tools else "agent_simulation"
+
         return AutoImproveConfig(
             target_skill=self.skill_name,
             skill_path=self.skill_path,
-            mode="agent_simulation",
+            mode=mode,
             audience=self.responses.get("audience", ""),
             expertise_level=self._infer_expertise(),
             style_notes=self._infer_style(),
