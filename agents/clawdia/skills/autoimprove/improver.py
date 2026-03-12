@@ -10,6 +10,7 @@ from pathlib import Path
 
 import httpx
 
+from api_utils import send_with_retries
 from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_obj, empty_usage, add_usage
 
 
@@ -56,12 +57,51 @@ Return ONLY a JSON object (no markdown fences, no commentary):
 """
 
 
+IMPROVER_FALLBACKS = {
+    "claude-opus-4-6": ("claude-sonnet-4-6",),
+    "claude-sonnet-4-6": ("claude-3-5-haiku-latest",),
+    "claude-3-7-sonnet-latest": ("claude-3-5-haiku-latest",),
+}
+
+
 class Improver:
     """Proposes and applies targeted skill file edits."""
 
+    MAX_PARSE_ATTEMPTS = 3
+
     def __init__(self):
         self.api_key = os.environ.get("ANTHROPIC_API_KEY")
+        self.model_chain = self._resolve_model_chain()
         self.token_usage = empty_usage()
+
+    @staticmethod
+    def _dedupe_chain(items: list[str]) -> list[str]:
+        out = []
+        seen = set()
+        for item in items:
+            model_id = str(item or "").strip()
+            if not model_id or model_id in seen:
+                continue
+            seen.add(model_id)
+            out.append(model_id)
+        return out
+
+    @classmethod
+    def _resolve_model_chain(cls) -> list[str]:
+        chain_env = os.environ.get("AUTOIMPROVE_IMPROVER_MODEL_CHAIN", "").strip()
+        if chain_env:
+            return cls._dedupe_chain([part for part in chain_env.split(",")])
+
+        primary = os.environ.get("AUTOIMPROVE_IMPROVER_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+        chain = [primary]
+
+        explicit_fallback = os.environ.get("AUTOIMPROVE_IMPROVER_FALLBACK_MODEL", "").strip()
+        if explicit_fallback:
+            chain.append(explicit_fallback)
+        else:
+            chain.extend(IMPROVER_FALLBACKS.get(primary, ()))
+
+        return cls._dedupe_chain(chain)
 
     def _track_usage(self, raw_usage: dict | None):
         add_usage(self.token_usage, raw_usage)
@@ -71,11 +111,179 @@ class Improver:
         self.token_usage = empty_usage()
         return usage
 
+    @staticmethod
+    def _extract_balanced_json_object(text: str) -> str:
+        start = text.find("{")
+        if start < 0:
+            return ""
+
+        depth = 0
+        in_string = False
+        escape = False
+        for idx in range(start, len(text)):
+            ch = text[idx]
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_string = False
+                continue
+
+            if ch == '"':
+                in_string = True
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return text[start:idx + 1]
+
+        return ""
+
+    @staticmethod
+    def _sanitize_edit(edit: dict | None) -> dict | None:
+        if not isinstance(edit, dict):
+            return None
+
+        desc = str(edit.get("edit_description", "")).strip()
+        edit_type = str(edit.get("edit_type", "add_section")).strip() or "add_section"
+        insert_after = str(edit.get("insert_after", "")).strip()
+        content_to_add = str(edit.get("content_to_add", "")).strip()
+
+        if not content_to_add:
+            return None
+
+        return {
+            "edit_description": desc or "Add targeted guidance for failing tests",
+            "edit_type": edit_type,
+            "insert_after": insert_after,
+            "content_to_add": content_to_add,
+        }
+
+    def _parse_edit_response(self, text: str) -> dict | None:
+        # Fast path.
+        parsed = parse_json_obj(text)
+        normalized = self._sanitize_edit(parsed)
+        if normalized:
+            return normalized
+
+        # Repair path 1: extract balanced object and parse.
+        candidate = self._extract_balanced_json_object(text)
+        if candidate:
+            normalized = self._sanitize_edit(parse_json_obj(candidate))
+            if normalized:
+                return normalized
+
+        # Repair path 2: normalize quote variants then retry.
+        cleaned = (
+            text.replace("\u201c", '"')
+            .replace("\u201d", '"')
+            .replace("\u2018", "'")
+            .replace("\u2019", "'")
+        )
+        normalized = self._sanitize_edit(parse_json_obj(cleaned))
+        if normalized:
+            return normalized
+
+        candidate = self._extract_balanced_json_object(cleaned)
+        if candidate:
+            normalized = self._sanitize_edit(parse_json_obj(candidate))
+            if normalized:
+                return normalized
+
+        return None
+
+    @staticmethod
+    def _default_anchor(skill_content: str) -> str:
+        for line in skill_content.splitlines():
+            s = line.strip()
+            if s.startswith("## "):
+                return line
+        for line in skill_content.splitlines():
+            s = line.strip()
+            if s.startswith("# "):
+                return line
+        return ""
+
+    def _fallback_edit(self, skill_content: str, worst_questions: list) -> dict:
+        worst_question = ""
+        if worst_questions:
+            worst_question = str(worst_questions[0].get("question", "")).strip()
+
+        content = (
+            "## Reliability And Evidence Guardrails\n\n"
+            "When evidence is weak, contradictory, or unavailable:\n"
+            "- Say exactly what is unknown instead of guessing.\n"
+            "- Prefer transparent uncertainty language over confident speculation.\n"
+            "- If a claim cannot be verified, state that directly and ask a clarifying follow-up.\n"
+            "- Never fabricate source names, URLs, dates, or quantitative results.\n"
+        )
+        if worst_question:
+            content += f"\nApplies especially to this failing pattern: \"{worst_question}\".\n"
+
+        return {
+            "edit_description": (
+                "Add reliability guardrails to reduce hallucinations "
+                "when evidence is uncertain"
+            ),
+            "edit_type": "add_section",
+            "insert_after": self._default_anchor(skill_content),
+            "content_to_add": content,
+        }
+
+    async def _request_with_failover(self, client: httpx.AsyncClient, messages: list) -> str:
+        last_error = None
+        chain = self.model_chain or [DEFAULT_MODEL]
+
+        for idx, model_id in enumerate(chain):
+            try:
+                resp = await send_with_retries(
+                    client,
+                    "POST",
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": self.api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": model_id,
+                        "max_tokens": 4096,
+                        "messages": messages,
+                    },
+                    timeout=120.0,
+                    max_attempts=4,
+                    component=f"improver.propose:{model_id}",
+                )
+                payload = resp.json()
+                self._track_usage(payload.get("usage"))
+                return payload["content"][0]["text"]
+            except Exception as e:
+                last_error = e
+                if idx < len(chain) - 1:
+                    print(
+                        f"Improver model {model_id} failed; "
+                        f"falling back to {chain[idx + 1]}: {e}",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"Improver model {model_id} failed with no remaining fallback: {e}",
+                        file=sys.stderr,
+                    )
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("Improver model chain is empty")
+
     async def propose(self, skill_content: str, config: AutoImproveConfig,
                       worst_questions: list, edit_history: str = "") -> dict:
         """
         Propose one edit. Returns dict with edit_description, insert_after,
-        content_to_add, etc. Returns None on failure.
+        content_to_add, etc. Returns deterministic fallback on parse failure.
         """
         if not self.api_key:
             return None
@@ -90,30 +298,33 @@ class Improver:
             edit_history=edit_history[-2000:] or "None yet.",
         )
 
+        messages = [{"role": "user", "content": prompt}]
+
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": self.api_key,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": DEFAULT_MODEL,
-                        "max_tokens": 4096,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                    timeout=120.0,
-                )
-                resp.raise_for_status()
-                payload = resp.json()
-                self._track_usage(payload.get("usage"))
-                text = payload["content"][0]["text"]
-                return parse_json_obj(text)
+                for attempt in range(self.MAX_PARSE_ATTEMPTS):
+                    text = await self._request_with_failover(client, messages)
+
+                    parsed = self._parse_edit_response(text)
+                    if parsed:
+                        return parsed
+
+                    # Retry with a stricter repair prompt.
+                    if attempt < self.MAX_PARSE_ATTEMPTS - 1:
+                        messages.append({"role": "assistant", "content": text[:3000]})
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                "Your last response was invalid JSON for strict parsing. "
+                                "Return ONLY one valid JSON object with double-quoted strings. "
+                                "Escape newlines in content_to_add as \\n and do not include commentary."
+                            ),
+                        })
+
+                return self._fallback_edit(skill_content, worst_questions)
         except Exception as e:
             print(f"Improver error: {e}", file=sys.stderr)
-            return None
+            return self._fallback_edit(skill_content, worst_questions)
 
     def apply(self, skill_path: str, edit: dict) -> bool:
         """

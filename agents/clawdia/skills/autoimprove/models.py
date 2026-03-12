@@ -271,13 +271,18 @@ class AutoImproveConfig:
         config = cls()
         text = Path(path).read_text()
         current_section = None
+        legacy_section = None
 
         for line in text.split("\n"):
             stripped = line.strip()
 
+            if not stripped:
+                legacy_section = None
+
             # Track sections
             if stripped.startswith("## "):
                 current_section = stripped[3:].strip().lower()
+                legacy_section = None
                 continue
 
             # Key-value pairs
@@ -292,11 +297,17 @@ class AutoImproveConfig:
                     config.repo_path = val
                 elif key == "mode":
                     config.mode = val
+                elif key == "target_skill":
+                    config.target_skill = val
                 elif key == "primary_users":
+                    config.audience = val
+                elif key == "audience":
                     config.audience = val
                 elif key == "expertise_level":
                     config.expertise_level = val
                 elif key == "style":
+                    config.style_notes = val
+                elif key == "style_notes":
                     config.style_notes = val
                 elif key == "grading_tier":
                     config.grading_tier = val
@@ -315,16 +326,25 @@ class AutoImproveConfig:
                 elif key == "token_budget":
                     try: config.token_budget = int(val)
                     except ValueError: pass
+                elif key == "priorities" and not val:
+                    legacy_section = "priorities"
+                elif key == "constraints" and not val:
+                    legacy_section = "constraints"
+                elif key in {"safety_rules", "safety rules"} and not val:
+                    legacy_section = "safety rules"
 
             # List items
-            if stripped.startswith("- ") and current_section:
+            active_section = current_section or legacy_section
+            if stripped.startswith("- ") and active_section:
                 item = stripped[2:].strip()
-                if current_section == "constraints":
+                if active_section == "constraints":
                     config.constraints.append(item)
-                elif current_section == "safety rules":
+                elif active_section == "safety rules":
                     config.safety_rules.append(item)
-                elif current_section == "example pairs" and item.startswith("Q: "):
+                elif active_section == "example pairs" and item.startswith("Q: "):
                     config.example_pairs.append({"question": item[3:], "answer": ""})
+                elif active_section == "priorities":
+                    config.priorities.append(item)
 
             # Example pair answer lines (indented "A: ...")
             if stripped.startswith("A: ") and current_section == "example pairs":
@@ -337,16 +357,17 @@ class AutoImproveConfig:
                 if item:
                     config.priorities.append(item)
 
-        # Extract name from header
-        for line in text.split("\n"):
-            if line.startswith("# AutoImprove"):
-                config.target_skill = (
-                    line.replace("# AutoImprove \u2014", "")
-                    .replace("# AutoImprove -", "")
-                    .replace("Program", "")
-                    .strip()
-                )
-                break
+        # Extract name from header only if not set explicitly in key-values.
+        if not config.target_skill:
+            for line in text.split("\n"):
+                if line.startswith("# AutoImprove"):
+                    config.target_skill = (
+                        line.replace("# AutoImprove \u2014", "")
+                        .replace("# AutoImprove -", "")
+                        .replace("Program", "")
+                        .strip()
+                    )
+                    break
 
         return config
 

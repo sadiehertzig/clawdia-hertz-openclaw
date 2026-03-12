@@ -80,6 +80,20 @@ To override weights, set them in `SCORE_WEIGHTS` in your grader or pass custom w
 - **2 API keys**: Two-model cross-examination (still useful)
 - **1 API key**: Single-model pass-through (no cross-examination)
 
+## Model Failover
+
+Each provider slot now has a built-in SOTA-1 fallback chain:
+
+- Anthropic slot: `claude-opus-4-6 -> claude-sonnet-4-6`
+- OpenAI slot: `gpt-5.4 -> gpt-5-mini`
+- Google slot: `gemini-3.1-pro-preview -> gemini-2.5-flash`
+
+You can override per-provider call order with:
+
+- `THREE_BODY_ANTHROPIC_MODEL_CHAIN`
+- `THREE_BODY_OPENAI_MODEL_CHAIN`
+- `THREE_BODY_GOOGLE_MODEL_CHAIN`
+
 ## Setup
 
 ### Requirements

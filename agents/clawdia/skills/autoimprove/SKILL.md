@@ -36,7 +36,7 @@ as an automated grading panel.
 - `autoimprove status` — show state of active improvement programs
 - `autoimprove results` — morning report for most recent run
 - `autoimprove pause/resume [skill]` — control nightly runs
-- `add test question for [skill]` — manually add a curated test case
+- `add test question for [skill] :: [question] || [ideal answer optional]` — manually add a curated test case
 - `show test bank for [skill]` — display test questions and scores
 
 ## Dependencies
@@ -44,4 +44,5 @@ as an automated grading panel.
 - three-body-council skill (installed and working)
 - httpx (`pip install httpx`)
 - git (for ratchet mechanism)
-- At least 2 of 3 API keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY
+- At least 2 of 3 API keys: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+- Optional improver failover override: `AUTOIMPROVE_IMPROVER_MODEL_CHAIN`

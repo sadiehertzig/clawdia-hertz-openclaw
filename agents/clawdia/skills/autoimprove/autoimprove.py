@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -280,10 +281,6 @@ class AutoImprove:
 
         engine = InterviewEngine(name, content, skill_path)
 
-        self._log("Analyzing skill for improvement suggestions...")
-        await engine.run_pre_analysis()
-        self._consume_component_usage("interview", engine)
-
         while not engine.is_complete():
             prompt = engine.get_next_prompt()
             if not prompt:
@@ -540,10 +537,11 @@ class AutoImprove:
 
             w_tid = min(new_scores, key=new_scores.get) if new_scores else ""
             w_sc = new_scores.get(w_tid, 0.0)
+            prev_agg = cur_agg
 
             if keep:
                 ratchet.commit(desc)
-                self.logger.log(desc, cur_agg, new_agg, True, reason, w_tid, w_sc)
+                self.logger.log(desc, prev_agg, new_agg, True, reason, w_tid, w_sc)
                 cur_scores, cur_verdicts, cur_agg = new_scores, new_verd, new_agg
                 skill_content = modified
                 prev_grade_keys = new_grade_keys
@@ -553,12 +551,12 @@ class AutoImprove:
                 }
                 prev_verdict_map = {v.test_id: v for v in new_verd}
                 consec_reverts = 0
-                self._log(f"  KEPT ({cur_agg:.3f} -> {new_agg:.3f})")
+                self._log(f"  KEPT ({prev_agg:.3f} -> {new_agg:.3f})")
             else:
                 # Restore the known-good content to disk (works with or without git)
                 Path(config.skill_path).write_text(skill_content)
                 ratchet.revert()
-                self.logger.log(desc, cur_agg, new_agg, False, reason, w_tid, w_sc)
+                self.logger.log(desc, prev_agg, new_agg, False, reason, w_tid, w_sc)
                 consec_reverts += 1
                 self._log(f"  REVERTED ({reason})")
 
@@ -766,7 +764,11 @@ class AutoImprove:
         kept = sum(1 for e in non_bl if e.get("kept") == "True")
         reverted = len(non_bl) - kept
 
-        first_agg = entries[0].get("aggregate_after", "?")
+        baseline_entries = [e for e in entries if e.get("edit_description") == "baseline"]
+        first_agg = (
+            baseline_entries[-1].get("aggregate_after", "?")
+            if baseline_entries else entries[0].get("aggregate_after", "?")
+        )
         last_agg = entries[-1].get("aggregate_after", "?")
 
         lines = [
@@ -804,48 +806,369 @@ REPORT_TRIGGERS = [
     "what did autoimprove", "improvement report",
 ]
 
+SESSION_STATE_PATH = _AUTOIMPROVE_DIR / "runtime_sessions.json"
+PAUSED_TARGETS_PATH = _AUTOIMPROVE_DIR / "paused_targets.json"
+
+
+def _read_json_file(path: Path, default):
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return default
+
+
+def _write_json_file(path: Path, payload):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
+
+
+def _context_value(context, key: str):
+    if isinstance(context, dict):
+        return context.get(key)
+    return getattr(context, key, None)
+
+
+def _session_key(context) -> str:
+    for key in ("session_id", "peer_id", "conversation_id"):
+        val = _context_value(context, key)
+        if val:
+            return str(val)
+    chat_id = _context_value(context, "chat_id")
+    thread_id = _context_value(context, "thread_id") or _context_value(context, "topic_id")
+    if chat_id:
+        return f"chat:{chat_id}:thread:{thread_id or 'root'}"
+    return "default"
+
+
+def _load_sessions() -> dict:
+    data = _read_json_file(SESSION_STATE_PATH, {})
+    return data if isinstance(data, dict) else {}
+
+
+def _save_sessions(data: dict):
+    _write_json_file(SESSION_STATE_PATH, data)
+
+
+def _load_paused_targets() -> set[str]:
+    data = _read_json_file(PAUSED_TARGETS_PATH, [])
+    if not isinstance(data, list):
+        return set()
+    return {str(x) for x in data}
+
+
+def _save_paused_targets(paused: set[str]):
+    _write_json_file(PAUSED_TARGETS_PATH, sorted(paused))
+
+
+def _all_target_names() -> list[str]:
+    if not TARGETS_DIR.exists():
+        return []
+    return sorted(d.name for d in TARGETS_DIR.iterdir() if d.is_dir())
+
+
+def _resolve_target_name(hint: str) -> str | None:
+    hint_l = hint.strip().lower()
+    if not hint_l:
+        return None
+    targets = _all_target_names()
+    for t in targets:
+        if t.lower() == hint_l:
+            return t
+    for t in targets:
+        if hint_l in t.lower():
+            return t
+    return None
+
+
+def _resolve_skill_match(hint: str) -> tuple[str, Path, str] | None:
+    raw_hint = hint.strip()
+    if not raw_hint:
+        return None
+
+    direct_path = Path(raw_hint).expanduser()
+    if direct_path.exists():
+        candidate = direct_path
+        if candidate.is_dir():
+            candidate = candidate / "SKILL.md"
+        if candidate.exists() and candidate.name.lower().endswith(".md"):
+            name = candidate.parent.name
+            content = candidate.read_text()
+            return name, candidate, content
+
+    hint_l = raw_hint.lower()
+    if not _SKILLS_DIR.exists():
+        return None
+
+    candidates = []
+    for d in _SKILLS_DIR.iterdir():
+        if not d.is_dir():
+            continue
+        md = d / "SKILL.md"
+        if md.exists():
+            candidates.append((d.name, md))
+
+    for name, md in candidates:
+        if name.lower() == hint_l:
+            content = md.read_text()
+            return name, md, content
+
+    for name, md in candidates:
+        if hint_l in name.lower():
+            content = md.read_text()
+            return name, md, content
+
+    return None
+
+
+def _serialize_interview(engine: InterviewEngine) -> dict:
+    return {
+        "step_index": engine.step_index,
+        "responses": dict(engine.responses),
+        "example_pairs": list(engine.example_pairs),
+    }
+
+
+def _hydrate_interview(state: dict, skill_name: str, skill_content: str, skill_path: str) -> InterviewEngine:
+    engine = InterviewEngine(skill_name, skill_content, skill_path)
+    engine.step_index = int(state.get("step_index", 0))
+    engine.responses = dict(state.get("responses", {}))
+    engine.example_pairs = list(state.get("example_pairs", []))
+    return engine
+
+
+def _extract_improve_hint(user_input: str) -> str | None:
+    text = user_input.strip()
+    lower = text.lower()
+
+    if lower.startswith("improve "):
+        return text[len("improve "):].strip()
+    if lower.startswith("optimize skill "):
+        return text[len("optimize skill "):].strip()
+    if lower.startswith("tune up "):
+        return text[len("tune up "):].strip()
+    if lower.startswith("make ") and lower.endswith(" better"):
+        return text[len("make "):-len(" better")].strip()
+
+    if lower in {"improve", "autoimprove", "self-improve", "make better"}:
+        return ""
+
+    return None
+
+
+def _ensure_target_config(target_name: str, skill_path: str, skill_content: str):
+    ai = AutoImprove(target_name, verbose=False)
+    if not ai.config_path().exists():
+        has_tools = ("web_search" in skill_content) or ("web_fetch" in skill_content)
+        cfg = AutoImproveConfig(
+            target_skill=target_name,
+            skill_path=skill_path,
+            mode="tool_simulation" if has_tools else "agent_simulation",
+            audience="general users",
+            expertise_level="mixed",
+            style_notes="clear explanation with concrete examples",
+        )
+        ai.save_config(cfg)
+    return ai
+
+
+def _append_curated_test(target_name: str, skill_name: str, skill_path: str,
+                         skill_content: str, question: str, answer: str = "") -> int:
+    ai = _ensure_target_config(target_name, skill_path, skill_content)
+    bank = ai.load_bank()
+    tc_id = f"tq-curated-{int(datetime.now(timezone.utc).timestamp())}"
+    bank.append(TestCase(
+        id=tc_id,
+        question=question,
+        tier="curated",
+        source="manual",
+        created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        verified_answer_summary=answer,
+    ))
+    ai.save_bank(bank)
+    return len(bank)
+
+
+def _format_test_bank(target_name: str) -> str:
+    ai = AutoImprove(target_name, verbose=False)
+    bank = ai.load_bank()
+    if not bank:
+        return f"Test bank for {target_name} is empty."
+    lines = [f"Test bank — {target_name} ({len(bank)} questions):"]
+    for tc in bank[:20]:
+        lines.append(
+            f"- {tc.id} [{tc.tier}/{tc.difficulty}] "
+            f"score={tc.last_score:.3f} :: {tc.question[:120]}"
+        )
+    if len(bank) > 20:
+        lines.append(f"... and {len(bank) - 20} more")
+    return "\n".join(lines)
+
+
+def _status_summary() -> str:
+    targets = _all_target_names()
+    if not targets:
+        return "No autoimprove targets yet. Say 'improve [skill name]' to start."
+    paused = _load_paused_targets()
+    lines = ["AutoImprove status:"]
+    for target in targets:
+        ai = AutoImprove(target, verbose=False)
+        entries = ai.logger.parse_entries()
+        current = entries[-1].get("aggregate_after", "n/a") if entries else "n/a"
+        state = "paused" if target in paused else "active"
+        lines.append(f"- {target}: score={current} ({state})")
+    return "\n".join(lines)
+
 
 async def handle_skill_request(user_input: str, context=None):
     lower = user_input.lower().strip()
 
+    session_id = _session_key(context)
+    sessions = _load_sessions()
+    active = sessions.get(session_id)
+
+    if active:
+        if lower in {"cancel", "stop", "abort", "nevermind", "never mind"}:
+            sessions.pop(session_id, None)
+            _save_sessions(sessions)
+            return "AutoImprove interview cancelled."
+
+        skill_path = str(active.get("skill_path", "")).strip()
+        skill_name = str(active.get("skill_name", "")).strip()
+        target_name = str(active.get("target_name", skill_name)).strip() or skill_name
+        if not skill_path or not Path(skill_path).exists():
+            sessions.pop(session_id, None)
+            _save_sessions(sessions)
+            return "Interview context expired (skill file missing). Say 'improve [skill]' to restart."
+
+        content = Path(skill_path).read_text()
+        engine = _hydrate_interview(active, skill_name, content, skill_path)
+        result = engine.process_response(user_input.strip())
+
+        if result == "confirm_program_revision":
+            sessions[session_id] = {
+                "skill_name": skill_name,
+                "target_name": target_name,
+                "skill_path": skill_path,
+                **_serialize_interview(engine),
+            }
+            _save_sessions(sessions)
+            return "\nGot it, revising.\n\n" + engine.get_next_prompt()
+
+        if engine.is_complete():
+            ai = AutoImprove(target_name, verbose=False)
+            cfg = engine.build_config()
+            ai.save_config(cfg)
+            examples = engine.get_example_pairs()
+            if examples:
+                gen = QuestionGenerator.__new__(QuestionGenerator)
+                bank = ai.load_bank()
+                for ex in examples:
+                    bank.append(gen.create_from_example(ex["question"], ex["answer"]))
+                ai.save_bank(bank)
+            sessions.pop(session_id, None)
+            _save_sessions(sessions)
+            return (
+                f"Saved improvement program for **{target_name}**.\n"
+                "Next: run `autoimprove.py generate --target "
+                f"{target_name}` then `autoimprove.py baseline --target {target_name}`."
+            )
+
+        sessions[session_id] = {
+            "skill_name": skill_name,
+            "target_name": target_name,
+            "skill_path": skill_path,
+            **_serialize_interview(engine),
+        }
+        _save_sessions(sessions)
+        return engine.get_next_prompt()
+
+    if lower.startswith("autoimprove status"):
+        return _status_summary()
+
+    pause_match = re.match(r"^autoimprove\s+(pause|resume)\s+(.+)$", lower)
+    if pause_match:
+        action = pause_match.group(1)
+        target_hint = user_input.strip().split(None, 2)[-1].strip()
+        target = _resolve_target_name(target_hint) or target_hint
+        paused = _load_paused_targets()
+        if action == "pause":
+            paused.add(target)
+            _save_paused_targets(paused)
+            return f"Paused autoimprove target: {target}"
+        paused.discard(target)
+        _save_paused_targets(paused)
+        return f"Resumed autoimprove target: {target}"
+
+    add_match = re.match(r"^add test question for\s+(.+?)\s*::\s*(.+)$", user_input.strip(), re.IGNORECASE)
+    if add_match:
+        skill_hint = add_match.group(1).strip()
+        payload = add_match.group(2).strip()
+        question = payload
+        answer = ""
+        if "||" in payload:
+            question, answer = [p.strip() for p in payload.split("||", 1)]
+
+        resolved = _resolve_skill_match(skill_hint)
+        if not resolved:
+            return f"Couldn't find a skill matching '{skill_hint}'."
+        skill_name, skill_md, skill_content = resolved
+        if not question:
+            return "Provide a question after `::`."
+
+        total = _append_curated_test(
+            target_name=skill_name,
+            skill_name=skill_name,
+            skill_path=str(skill_md),
+            skill_content=skill_content,
+            question=question,
+            answer=answer,
+        )
+        return f"Added curated test question to {skill_name}. Bank now has {total} questions."
+
+    if lower.startswith("add test question for "):
+        return (
+            "Use: `add test question for <skill> :: <question> || <ideal answer optional>`"
+        )
+
+    show_match = re.match(r"^show test bank for\s+(.+)$", user_input.strip(), re.IGNORECASE)
+    if show_match:
+        skill_hint = show_match.group(1).strip()
+        target = _resolve_target_name(skill_hint)
+        if target is None:
+            resolved = _resolve_skill_match(skill_hint)
+            if not resolved:
+                return f"Couldn't find target/skill matching '{skill_hint}'."
+            target = resolved[0]
+        return _format_test_bank(target)
+
     if any(t in lower for t in REPORT_TRIGGERS):
-        if TARGETS_DIR.exists():
-            targets = [d.name for d in TARGETS_DIR.iterdir() if d.is_dir()]
-            if targets:
-                return "\n\n---\n\n".join(AutoImprove(t, verbose=False).report() for t in targets)
-        return "No autoimprove targets yet. Say 'improve [skill name]' to start."
+        targets = _all_target_names()
+        if not targets:
+            return "No autoimprove targets yet. Say 'improve [skill name]' to start."
+        return "\n\n---\n\n".join(AutoImprove(t, verbose=False).report() for t in targets)
 
-    hint = lower
-    for t in SKILL_TRIGGERS:
-        hint = hint.replace(t, "")
-    hint = hint.strip()
-
-    if not hint:
+    hint = _extract_improve_hint(user_input)
+    if hint is None:
         return "Which skill should I improve? Name it, upload the SKILL.md, or give me the path."
+    if not hint:
+        return "Which skill should I improve?"
 
-    skills_dir = _SKILLS_DIR
-
-    found = None
-    if skills_dir.exists():
-        for d in skills_dir.iterdir():
-            if d.is_dir() and hint in d.name.lower():
-                md = d / "SKILL.md"
-                if md.exists():
-                    found = md
-                    break
-
-    if not found:
+    resolved = _resolve_skill_match(hint)
+    if not resolved:
         return f"Couldn't find a skill matching '{hint}'. Upload the SKILL.md or give me the path."
 
-    content = found.read_text()
-    name = found.parent.name
-
-    return (
-        f"I've read the **{name}** skill ({len(content)} chars).\n\n"
-        f"Let me ask a few questions to set up the improvement program.\n\n"
-        f"What's bothering you about this skill right now? Specific failures, "
-        f"general quality issues, complaints — anything."
-    )
+    skill_name, skill_md, content = resolved
+    engine = InterviewEngine(skill_name, content, str(skill_md))
+    sessions[session_id] = {
+        "skill_name": skill_name,
+        "target_name": skill_name,
+        "skill_path": str(skill_md),
+        **_serialize_interview(engine),
+    }
+    _save_sessions(sessions)
+    return engine.get_next_prompt()
 
 
 # ---------------------------------------------------------

@@ -35,7 +35,7 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 | `autoimprove status` | Show state of active improvement programs |
 | `autoimprove results` | Morning report for the most recent run |
 | `autoimprove pause/resume [skill]` | Control nightly runs |
-| `add test question for [skill]` | Manually add a curated test case |
+| `add test question for [skill] :: [question] || [ideal answer optional]` | Manually add a curated test case |
 | `show test bank for [skill]` | Display test questions and scores |
 
 ## Setup
@@ -117,7 +117,7 @@ The usage report at the end of each run shows exactly where tokens went, so you 
 
 ```
 autoimprove.py   — Main orchestrator and CLI
-interview.py     — Onboarding conversation (7-step state machine)
+interview.py     — Onboarding conversation (6-step state machine)
 question_gen.py  — Test bank generation (Channel A: diverse, Channel C: gap-filling)
 runner.py        — Executes skill against test questions
 grader.py        — Tiered evaluation via Three-Body Council
@@ -126,6 +126,20 @@ improver.py      — Proposes and applies SKILL.md edits
 notify.py        — Telegram approval flow
 models.py        — Data models (TestCase, Verdict, Config, ResultsLogger)
 ```
+
+## Improver Model Failover
+
+The `improver.py` agent now supports automatic Anthropic model failover:
+
+- Default chain from `DEFAULT_MODEL` in `models.py`
+- Built-in SOTA-1 fallback (for example `claude-opus-4-6 -> claude-sonnet-4-6`)
+- For the current default (`claude-sonnet-4-6`), fallback is `claude-3-5-haiku-latest`
+
+Optional env overrides:
+
+- `AUTOIMPROVE_IMPROVER_MODEL_CHAIN` (comma-separated full chain)
+- `AUTOIMPROVE_IMPROVER_MODEL` (primary)
+- `AUTOIMPROVE_IMPROVER_FALLBACK_MODEL` (single fallback)
 
 ## License
 

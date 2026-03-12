@@ -36,6 +36,7 @@ if str(_TBC_PATH) not in sys.path:
 from three_body_council import ThreeBodyCouncil
 
 import httpx
+from api_utils import send_with_retries
 
 
 class Grader:
@@ -304,7 +305,9 @@ class Grader:
 
         try:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(
+                resp = await send_with_retries(
+                    client,
+                    "POST",
                     "https://api.anthropic.com/v1/messages",
                     headers={
                         "x-api-key": api_key,
@@ -317,8 +320,9 @@ class Grader:
                         "messages": [{"role": "user", "content": prompt}],
                     },
                     timeout=90.0,
+                    max_attempts=4,
+                    component="grader.quick_grade",
                 )
-                resp.raise_for_status()
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
                 text = payload["content"][0]["text"]

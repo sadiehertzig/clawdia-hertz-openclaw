@@ -22,6 +22,12 @@ A multi-model deliberation skill that convenes three frontier AI models into a s
 - **GPT-5.4** (OpenAI)
 - **Gemini 3.1 Pro** (Google)
 
+Default failover chains:
+
+- Anthropic: `claude-opus-4-6 -> claude-sonnet-4-6`
+- OpenAI: `gpt-5.4 -> gpt-5-mini`
+- Google: `gemini-3.1-pro-preview -> gemini-2.5-flash`
+
 The council gracefully degrades to 2-model or 1-model mode if some API keys are unavailable.
 
 ## Usage
@@ -81,6 +87,7 @@ Set these environment variables (or in `~/.openclaw/.env`):
 - `ANTHROPIC_API_KEY` — for Claude Opus 4.6
 - `OPENAI_API_KEY` — for GPT-5.4
 - `GEMINI_API_KEY` — for Gemini 3.1 Pro
+- Optional per-slot override: `THREE_BODY_<PROVIDER>_MODEL_CHAIN` (comma-separated)
 
 Python runtime dependency:
 

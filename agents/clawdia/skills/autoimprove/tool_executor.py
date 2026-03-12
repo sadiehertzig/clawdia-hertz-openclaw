@@ -1,99 +1,204 @@
 """
-Tool executor for AutoImprove tool_simulation mode.
-Provides real web_search (DuckDuckGo) and web_fetch implementations.
+Tool executor for AutoImprove.
+Provides Gemini-backed web_search and HTTP web_fetch implementations.
 """
 
+import json
 import os
-import re
-from html import unescape
-from urllib.parse import unquote
 
 import httpx
+
+from api_utils import GEMINI_SEARCH_TOOL_OPTIONS, send_with_retries
 
 
 FETCH_MAX_CHARS = 15_000
 FETCH_TIMEOUT = 30.0
-SEARCH_TIMEOUT = 15.0
+SEARCH_TIMEOUT = 60.0
 
-DDG_URL = "https://html.duckduckgo.com/html/"
+GEMINI_MODEL = "gemini-3.1-pro-preview"
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    f"{GEMINI_MODEL}:generateContent"
+)
 
 
 async def web_search(query: str, count: int = 10) -> dict:
-    """Search the web using DuckDuckGo."""
+    """Search the web using Gemini grounding."""
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return {"error": "No GEMINI_API_KEY set", "results": []}
+
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                DDG_URL,
-                data={"q": query},
-                headers={
-                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
-                },
-                timeout=SEARCH_TIMEOUT,
-            )
-            resp.raise_for_status()
-            html = resp.text
+        count = int(count or 10)
+    except (TypeError, ValueError):
+        count = 10
+    count = max(1, min(count, 10))
 
-        results = _parse_ddg_html(html)
-        return {"results": results[:count]}
-    except Exception as e:
-        return {"error": str(e), "results": []}
-
-
-def _parse_ddg_html(html: str) -> list:
-    """Parse DuckDuckGo HTML search results."""
-    results = []
-
-    # DDG lite HTML: <a rel="nofollow" class="result__a" href="...">
-    link_pattern = re.compile(
-        r'<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
-        re.DOTALL,
-    )
-    snippet_pattern = re.compile(
-        r'<a[^>]*class="[^"]*result__snippet[^"]*"[^>]*>(.*?)</a>',
-        re.DOTALL,
+    prompt = (
+        "Use web search and return only a JSON array of result objects "
+        "with keys: title, url, snippet.\n\n"
+        f"Query: {query}\n"
+        f"Result count: {count}\n"
+        "JSON only."
     )
 
-    links = link_pattern.findall(html)
-    snippets = snippet_pattern.findall(html)
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
 
-    for i, (raw_url, raw_title) in enumerate(links):
-        url = raw_url
-        if "uddg=" in url:
-            match = re.search(r'uddg=([^&]+)', url)
-            if match:
-                url = unquote(match.group(1))
-        elif url.startswith("//"):
-            url = "https:" + url
+    base_body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.1},
+    }
 
-        title = _strip_html(raw_title)
-        snippet = _strip_html(snippets[i]) if i < len(snippets) else ""
+    last_error = "Gemini search failed"
+    async with httpx.AsyncClient() as client:
+        for tools in GEMINI_SEARCH_TOOL_OPTIONS + [None]:
+            body = dict(base_body)
+            if tools is not None:
+                body["tools"] = tools
 
-        if url and title:
-            results.append({
-                "title": title[:200],
-                "url": url,
-                "snippet": snippet[:300],
-            })
+            try:
+                resp = await send_with_retries(
+                    client,
+                    "POST",
+                    GEMINI_URL,
+                    headers=headers,
+                    json=body,
+                    timeout=SEARCH_TIMEOUT,
+                    max_attempts=4,
+                    component="tool_executor.web_search",
+                )
+            except Exception as e:
+                last_error = str(e)
+                continue
 
-    return results
+            payload = resp.json()
+            results = _extract_results(payload, count)
+            if results:
+                return {"results": results}
+            last_error = "Gemini returned no search results"
+
+    return {"error": last_error, "results": []}
 
 
-def _strip_html(text: str) -> str:
-    """Remove HTML tags and decode entities."""
-    text = re.sub(r'<[^>]+>', '', text)
-    return unescape(text).strip()
+def _extract_results(payload: dict, count: int) -> list:
+    text = _extract_text(payload)
+    parsed = _parse_json_array(text)
+    normalized = _normalize_results(parsed, count)
+    if normalized:
+        return normalized
+    return _extract_grounding_results(payload, count)
+
+
+def _extract_text(payload: dict) -> str:
+    candidates = payload.get("candidates", [])
+    if not candidates:
+        return ""
+    parts = candidates[0].get("content", {}).get("parts", [])
+    chunks = [p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p]
+    return "\n".join(chunks).strip()
+
+
+def _parse_json_array(text: str) -> list:
+    if not text:
+        return []
+    cleaned = text.strip()
+    if "```" in cleaned:
+        cleaned = cleaned.split("```", 1)[-1]
+        cleaned = cleaned.rsplit("```", 1)[0]
+    cleaned = cleaned.strip()
+    if cleaned.startswith("json"):
+        cleaned = cleaned[4:].strip()
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, list):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    start = cleaned.find("[")
+    end = cleaned.rfind("]") + 1
+    if start >= 0 and end > start:
+        try:
+            parsed = json.loads(cleaned[start:end])
+            if isinstance(parsed, list):
+                return parsed
+        except json.JSONDecodeError:
+            return []
+    return []
+
+
+def _normalize_results(items: list, count: int) -> list:
+    out = []
+    seen = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or item.get("link") or "").strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        title = str(item.get("title") or item.get("name") or url).strip()
+        snippet = str(
+            item.get("snippet")
+            or item.get("summary")
+            or item.get("description")
+            or ""
+        ).strip()
+        out.append({
+            "title": title[:200],
+            "url": url[:1000],
+            "snippet": snippet[:500],
+        })
+        if len(out) >= count:
+            break
+    return out
+
+
+def _extract_grounding_results(payload: dict, count: int) -> list:
+    candidates = payload.get("candidates", [])
+    if not candidates:
+        return []
+    grounding = candidates[0].get("groundingMetadata", {})
+    chunks = grounding.get("groundingChunks", [])
+    out = []
+    seen = set()
+    for chunk in chunks:
+        if not isinstance(chunk, dict):
+            continue
+        web = chunk.get("web", {})
+        if not isinstance(web, dict):
+            continue
+        url = str(web.get("uri") or web.get("url") or "").strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        title = str(web.get("title") or url).strip()
+        out.append({
+            "title": title[:200],
+            "url": url[:1000],
+            "snippet": "",
+        })
+        if len(out) >= count:
+            break
+    return out
 
 
 async def web_fetch(url: str) -> dict:
     """Fetch a web page and return its text content."""
     try:
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            resp = await client.get(
+            resp = await send_with_retries(
+                client,
+                "GET",
                 url,
                 headers={"User-Agent": "OpenClaw-AutoImprove/1.0"},
                 timeout=FETCH_TIMEOUT,
+                max_attempts=3,
+                component="tool_executor.web_fetch",
             )
-            resp.raise_for_status()
             text = resp.text[:FETCH_MAX_CHARS]
         return {"url": url, "content": text, "status": resp.status_code}
     except Exception as e:

@@ -4,58 +4,23 @@ Runs test questions through a skill, captures responses.
 
 Modes:
     agent_simulation  — inject skill as system prompt, query a model
-    tool_simulation   — like agent_simulation but with real tool execution (Gemini)
+    tool_simulation   — single grounded Gemini call (real web grounding)
     direct_invocation — call the skill's Python entry point
 """
 
 import asyncio
 import hashlib
 import importlib.util
-import inspect
-import json
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 
+from api_utils import GEMINI_SEARCH_TOOL_OPTIONS, send_with_retries
 from models import TestCase, DEFAULT_MODEL, empty_usage, add_usage
-from tool_executor import TOOL_REGISTRY
 
-GEMINI_MODEL = "gemini-3.1-pro-preview"
-
-TOOL_DECLARATIONS = [
-    {
-        "name": "web_search",
-        "description": (
-            "Search the web using Brave Search. Returns a list of results "
-            "with titles, URLs, and snippets."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "query": {"type": "STRING", "description": "Search query"},
-                "count": {
-                    "type": "INTEGER",
-                    "description": "Number of results (default 10)",
-                },
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "name": "web_fetch",
-        "description": "Fetch the text content of a web page by URL.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "url": {"type": "STRING", "description": "URL to fetch"},
-            },
-            "required": ["url"],
-        },
-    },
-]
+GEMINI_MODEL = "gemini-2.5-flash"
 
 
 class ResponseRunner:
@@ -72,6 +37,48 @@ class ResponseRunner:
     def _response_hash(text: str) -> str:
         raw = (text or "").replace("\r\n", "\n").strip()
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _gemini_usage(usage_meta: dict | None) -> dict:
+        usage_meta = usage_meta or {}
+        return {
+            "input_tokens": usage_meta.get("promptTokenCount", 0),
+            "output_tokens": usage_meta.get("candidatesTokenCount", 0),
+            "total_tokens": usage_meta.get("totalTokenCount", 0),
+        }
+
+    @staticmethod
+    def _extract_gemini_text(payload: dict) -> str:
+        candidates = payload.get("candidates", [])
+        if not candidates:
+            return ""
+        parts = candidates[0].get("content", {}).get("parts", [])
+        chunks = [p.get("text", "") for p in parts if isinstance(p, dict) and "text" in p]
+        return "\n".join(chunks).strip()
+
+    @staticmethod
+    def _extract_grounding_urls(payload: dict, limit: int = 5) -> list[str]:
+        candidates = payload.get("candidates", [])
+        if not candidates:
+            return []
+        grounding = candidates[0].get("groundingMetadata", {})
+        chunks = grounding.get("groundingChunks", [])
+        urls = []
+        seen = set()
+        for chunk in chunks:
+            if not isinstance(chunk, dict):
+                continue
+            web = chunk.get("web", {})
+            if not isinstance(web, dict):
+                continue
+            url = str(web.get("uri") or web.get("url") or "").strip()
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            urls.append(url)
+            if len(urls) >= limit:
+                break
+        return urls
 
     def consume_usage(self) -> dict:
         usage = dict(self.token_usage)
@@ -124,7 +131,9 @@ class ResponseRunner:
 
         async with httpx.AsyncClient() as client:
             try:
-                resp = await client.post(
+                resp = await send_with_retries(
+                    client,
+                    "POST",
                     "https://api.anthropic.com/v1/messages",
                     headers={
                         "x-api-key": self.anthropic_key,
@@ -138,8 +147,9 @@ class ResponseRunner:
                         "messages": [{"role": "user", "content": tc.question}],
                     },
                     timeout=120.0,
+                    max_attempts=4,
+                    component="runner.agent_sim",
                 )
-                resp.raise_for_status()
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
                 text = payload["content"][0]["text"]
@@ -164,7 +174,10 @@ class ResponseRunner:
 
     async def _run_tool_sim(self, skill_content: str, tc: TestCase,
                             style_notes: str = "") -> dict:
-        """Run with real tool execution via Gemini."""
+        """
+        Run with a single Gemini grounded call.
+        This avoids nested Gemini-in-Gemini tool execution loops.
+        """
         api_key = os.environ.get("GEMINI_API_KEY", "")
         if not api_key:
             return self._err(tc, "No GEMINI_API_KEY set")
@@ -178,8 +191,9 @@ class ResponseRunner:
             f"{skill_content[:12000]}\n\n"
             "Answer the user's question using the knowledge and procedures "
             "in this skill file. Be specific, concrete, and actionable. "
-            "You have access to web_search and web_fetch tools — use them "
-            f"to gather real information as instructed by the skill.{style_instruction}"
+            "You have web grounding available via Gemini search tools. "
+            "If the skill refers to web_search/web_fetch, satisfy that intent "
+            f"using grounded web results in this same response.{style_instruction}"
         )
 
         url = (
@@ -191,101 +205,65 @@ class ResponseRunner:
             "x-goog-api-key": api_key,
         }
 
-        contents = [{"role": "user", "parts": [{"text": tc.question}]}]
-        total_usage = {}
+        last_error = "Gemini tool simulation failed"
+        total_usage = empty_usage()
 
-        try:
-            async with httpx.AsyncClient() as client:
-                for _ in range(10):  # max tool rounds
-                    body = {
-                        "system_instruction": {"parts": [{"text": system}]},
-                        "contents": contents,
-                        "tools": [{"functionDeclarations": TOOL_DECLARATIONS}],
-                        "generationConfig": {"maxOutputTokens": 4096},
-                    }
+        async with httpx.AsyncClient() as client:
+            for tools in GEMINI_SEARCH_TOOL_OPTIONS + [None]:
+                body = {
+                    "system_instruction": {"parts": [{"text": system}]},
+                    "contents": [{"role": "user", "parts": [{"text": tc.question}]}],
+                    "generationConfig": {"maxOutputTokens": 4096},
+                }
+                if tools is not None:
+                    body["tools"] = tools
 
-                    resp = await client.post(
-                        url, headers=headers, json=body, timeout=120.0,
+                try:
+                    resp = await send_with_retries(
+                        client,
+                        "POST",
+                        url,
+                        headers=headers,
+                        json=body,
+                        timeout=120.0,
+                        max_attempts=4,
+                        component="runner.tool_sim",
                     )
-                    resp.raise_for_status()
-                    data = resp.json()
+                    payload = resp.json()
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
-                    # Track usage
-                    usage_meta = data.get("usageMetadata", {})
-                    total_usage = {
-                        "input_tokens": usage_meta.get(
-                            "promptTokenCount", 0),
-                        "output_tokens": usage_meta.get(
-                            "candidatesTokenCount", 0),
-                        "total_tokens": usage_meta.get(
-                            "totalTokenCount", 0),
-                    }
+                add_usage(total_usage, self._gemini_usage(payload.get("usageMetadata", {})))
+                text = self._extract_gemini_text(payload)
+                if not text:
+                    last_error = "Gemini returned no text response"
+                    continue
 
-                    candidate = data["candidates"][0]
-                    parts = candidate["content"]["parts"]
+                sources = self._extract_grounding_urls(payload)
+                if sources:
+                    text = text.rstrip() + "\n\nSources:\n" + "\n".join(f"- {u}" for u in sources)
 
-                    # Check for function calls
-                    fn_calls = [
-                        p for p in parts if "functionCall" in p
-                    ]
-                    if not fn_calls:
-                        # No tool calls — extract final text
-                        text_parts = [
-                            p["text"] for p in parts if "text" in p
-                        ]
-                        text = "\n".join(text_parts)
-                        self._track_usage(total_usage)
-                        return {
-                            "test_id": tc.id,
-                            "question": tc.question,
-                            "response": text,
-                            "response_hash": self._response_hash(text),
-                            "key_assertions": tc.key_assertions,
-                            "anti_assertions": tc.anti_assertions,
-                            "rubric": tc.rubric,
-                            "test_tier": tc.tier,
-                            "difficulty": tc.difficulty,
-                            "timestamp": datetime.now(
-                                timezone.utc).isoformat(),
-                            "model": GEMINI_MODEL,
-                            "mode": "tool_simulation",
-                            "token_usage": total_usage,
-                            "error": False,
-                        }
-
-                    # Execute tool calls and build response
-                    contents.append({"role": "model", "parts": parts})
-
-                    fn_response_parts = []
-                    for fc_part in fn_calls:
-                        fc = fc_part["functionCall"]
-                        fn_name = fc["name"]
-                        fn_args = fc.get("args", {})
-
-                        executor = TOOL_REGISTRY.get(fn_name)
-                        if executor:
-                            result = await executor(**fn_args)
-                        else:
-                            result = {"error": f"Unknown tool: {fn_name}"}
-
-                        fn_response_parts.append({
-                            "functionResponse": {
-                                "name": fn_name,
-                                "response": result,
-                            }
-                        })
-
-                    contents.append({
-                        "role": "user",
-                        "parts": fn_response_parts,
-                    })
-
-                # Exhausted tool rounds — return what we have
                 self._track_usage(total_usage)
-                return self._err(tc, "Exceeded max tool rounds (10)")
+                return {
+                    "test_id": tc.id,
+                    "question": tc.question,
+                    "response": text,
+                    "response_hash": self._response_hash(text),
+                    "key_assertions": tc.key_assertions,
+                    "anti_assertions": tc.anti_assertions,
+                    "rubric": tc.rubric,
+                    "test_tier": tc.tier,
+                    "difficulty": tc.difficulty,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "model": GEMINI_MODEL,
+                    "mode": "tool_simulation",
+                    "token_usage": dict(total_usage),
+                    "error": False,
+                }
 
-        except Exception as e:
-            return self._err(tc, str(e))
+        self._track_usage(total_usage)
+        return self._err(tc, last_error)
 
     def _find_entry_point(self, skill_path: str) -> str | None:
         """

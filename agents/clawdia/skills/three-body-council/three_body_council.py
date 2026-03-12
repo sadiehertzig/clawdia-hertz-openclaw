@@ -37,6 +37,7 @@ class ModelConfig:
     model_id: str
     api_env_key: str
     endpoint: str
+    fallback_model_ids: tuple[str, ...] = ()
 
 
 MODELS = {
@@ -46,6 +47,7 @@ MODELS = {
         model_id="claude-opus-4-6",
         api_env_key="ANTHROPIC_API_KEY",
         endpoint="https://api.anthropic.com/v1/messages",
+        fallback_model_ids=("claude-sonnet-4-6",),
     ),
     "openai": ModelConfig(
         name="GPT-5.4",
@@ -53,6 +55,7 @@ MODELS = {
         model_id="gpt-5.4",
         api_env_key="OPENAI_API_KEY",
         endpoint="https://api.openai.com/v1/responses",
+        fallback_model_ids=("gpt-5-mini",),
     ),
     "google": ModelConfig(
         name="Gemini 3.1 Pro",
@@ -60,8 +63,46 @@ MODELS = {
         model_id="gemini-3.1-pro-preview",
         api_env_key="GEMINI_API_KEY",
         endpoint="https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent",
+        fallback_model_ids=("gemini-2.5-flash",),
     ),
 }
+
+
+def _dedupe_model_chain(model_ids: list[str]) -> list[str]:
+    out = []
+    seen = set()
+    for model_id in model_ids:
+        m = str(model_id or "").strip()
+        if not m or m in seen:
+            continue
+        seen.add(m)
+        out.append(m)
+    return out
+
+
+def _resolve_model_chain(key: str, cfg: ModelConfig) -> list[str]:
+    """
+    Resolve call order for a provider slot.
+
+    Env overrides:
+    - THREE_BODY_<PROVIDER>_MODEL_CHAIN=primary,fallback1,fallback2
+    - THREE_BODY_<PROVIDER>_FALLBACK_MODEL=fallback
+    """
+    chain_env = os.environ.get(f"THREE_BODY_{key.upper()}_MODEL_CHAIN", "").strip()
+    if chain_env:
+        return _dedupe_model_chain([part for part in chain_env.split(",")])
+
+    chain = [cfg.model_id, *cfg.fallback_model_ids]
+    extra_fallback = os.environ.get(f"THREE_BODY_{key.upper()}_FALLBACK_MODEL", "").strip()
+    if extra_fallback:
+        chain.append(extra_fallback)
+    return _dedupe_model_chain(chain)
+
+
+def _model_label_for_id(cfg: ModelConfig, model_id: str) -> str:
+    if model_id == cfg.model_id:
+        return cfg.name
+    return f"{cfg.name} fallback ({model_id})"
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -588,18 +629,25 @@ class ThreeBodyCouncil:
         self.verbose = verbose
         self.synthesizer = synthesizer
         self.api_keys = {}
+        self._model_chains = {}
         self._token_lock = threading.Lock()
         self._token_counter = self._empty_counter()
 
         # Load API keys from environment or .env
         self._load_env()
         for key, cfg in MODELS.items():
+            self._model_chains[key] = _resolve_model_chain(key, cfg)
+        for key, cfg in MODELS.items():
             val = os.environ.get(cfg.api_env_key, "")
             if val:
                 self.api_keys[key] = val
 
         if verbose:
-            available = [MODELS[k].name for k in self.api_keys]
+            available = []
+            for key in self.api_keys:
+                cfg = MODELS[key]
+                chain = self._model_chains.get(key, [cfg.model_id])
+                available.append(f"{cfg.name} [{', '.join(chain)}]")
             self._log(f"Three-Body Council initialized. Models available: {available}")
 
     @staticmethod
@@ -692,22 +740,36 @@ class ThreeBodyCouncil:
         cfg = MODELS[key]
         api_key = self.api_keys[key]
         caller = API_CALLERS[cfg.provider]
-        self._log(f"  -> Calling {cfg.name}...")
-        try:
-            call_result = caller(
-                api_key, cfg.model_id, system, user_msg,
-                max_output_tokens=max_output_tokens,
-            )
-            if isinstance(call_result, tuple) and len(call_result) == 2:
-                result, usage = call_result
-            else:
-                result, usage = call_result, _zero_usage()
-            self._record_usage(key, usage)
-            self._log(f"  OK {cfg.name} responded ({len(result)} chars)")
-            return result
-        except Exception as e:
-            self._log(f"  FAIL {cfg.name} failed: {_redact_sensitive(str(e))}")
-            raise
+        chain = self._model_chains.get(key, [cfg.model_id])
+        last_error = None
+
+        for idx, model_id in enumerate(chain):
+            label = _model_label_for_id(cfg, model_id)
+            self._log(f"  -> Calling {label}...")
+            try:
+                call_result = caller(
+                    api_key, model_id, system, user_msg,
+                    max_output_tokens=max_output_tokens,
+                )
+                if isinstance(call_result, tuple) and len(call_result) == 2:
+                    result, usage = call_result
+                else:
+                    result, usage = call_result, _zero_usage()
+                self._record_usage(key, usage)
+                self._log(f"  OK {label} responded ({len(result)} chars)")
+                return result
+            except Exception as e:
+                last_error = e
+                self._log(f"  FAIL {label} failed: {_redact_sensitive(str(e))}")
+                if idx < len(chain) - 1:
+                    next_label = _model_label_for_id(cfg, chain[idx + 1])
+                    self._log(f"  -> Falling back to {next_label}")
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"No model configured for provider slot: {key}")
 
     def _call_models_parallel(self, calls: dict) -> dict:
         """
