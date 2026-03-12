@@ -21,5 +21,13 @@ agents/*/logs/
 .DS_Store
 runtime_state/
 
+# python artifacts
+__pycache__/
+*.pyc
+
+# autoimprove runtime outputs (generated)
+agents/clawdia/skills/autoimprove/targets/
+agents/clawdia/skills/autoimprove/_tg_offset
+
 # agent mirrors
 mirrors/

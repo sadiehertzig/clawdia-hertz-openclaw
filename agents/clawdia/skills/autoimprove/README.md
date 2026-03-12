@@ -69,6 +69,15 @@ clawhub install three-body-council
 pip install httpx requests
 ```
 
+### Runtime Sync (Recommended)
+
+Use repository skills as source-of-truth and sync runtime copies before running long sweeps:
+
+```bash
+./scripts/sync-clawdia-skills.sh --check
+./scripts/sync-clawdia-skills.sh
+```
+
 > **Note:** ClawHub installs skill files only — Python dependencies and required sibling skills must be installed separately. AutoImprove will not work without the Three-Body Council skill.
 
 ## Token usage tracking
