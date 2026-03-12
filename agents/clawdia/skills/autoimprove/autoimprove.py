@@ -173,6 +173,7 @@ class AutoImprove:
 
     def config_path(self): return self.target_dir / "program.md"
     def bank_path(self):   return self.target_dir / "test_bank.json"
+    def grade_cache_path(self): return self.target_dir / "grade_cache.json"
 
     def load_config(self):
         p = self.config_path()
@@ -186,6 +187,89 @@ class AutoImprove:
 
     def save_bank(self, bank):
         save_test_bank(bank, str(self.bank_path()))
+
+    def load_grade_cache(self) -> dict:
+        path = self.grade_cache_path()
+        if not path.exists():
+            return {}
+        try:
+            payload = json.loads(path.read_text())
+        except Exception:
+            return {}
+        if isinstance(payload, dict) and isinstance(payload.get("items"), dict):
+            return payload["items"]
+        if isinstance(payload, dict):
+            # Backward compatibility if older cache was stored as plain dict.
+            return payload
+        return {}
+
+    def save_grade_cache(self, cache: dict):
+        self.grade_cache_path().write_text(
+            json.dumps({"version": 1, "items": cache}, indent=2)
+        )
+
+    async def _grade_with_cache(self, grader: Grader, responses: list,
+                                skill_summary: str, config: AutoImproveConfig,
+                                cache: dict,
+                                previous_scores: dict | None = None) -> tuple[list, dict]:
+        """Grade responses using persistent cache; only miss entries call LLMs."""
+        if not responses:
+            return [], {"graded": 0, "cached": 0}
+
+        previous_scores = previous_scores or {}
+        verdict_by_test = {}
+        to_grade = []
+
+        for resp in responses:
+            key = Grader.build_grade_key(resp, skill_summary, config)
+            cached = cache.get(key)
+            if cached:
+                verdict = Verdict.from_dict(cached)
+                verdict.test_id = resp.get("test_id", verdict.test_id)
+                verdict_by_test[verdict.test_id] = verdict
+                continue
+            item = dict(resp)
+            item["_grade_key"] = key
+            to_grade.append(item)
+
+        if to_grade:
+            prev_subset = {
+                r.get("test_id"): previous_scores.get(r.get("test_id"))
+                for r in to_grade
+                if r.get("test_id") in previous_scores
+            }
+            fresh = await grader.grade_batch(
+                to_grade,
+                skill_summary,
+                config,
+                previous_scores=prev_subset or None,
+            )
+            for resp, verdict in zip(to_grade, fresh):
+                tid = resp.get("test_id", verdict.test_id)
+                verdict.test_id = tid
+                verdict_by_test[tid] = verdict
+                cache_key = resp.get("_grade_key")
+                if cache_key:
+                    cache[cache_key] = verdict.to_dict()
+
+        ordered = []
+        for resp in responses:
+            tid = resp.get("test_id", "unknown")
+            verdict = verdict_by_test.get(tid)
+            if verdict is None:
+                verdict = Verdict(
+                    test_id=tid,
+                    grading_tier="error",
+                    composite_score=0.0,
+                    summary="Missing verdict",
+                    flags=["error"],
+                )
+            ordered.append(verdict)
+
+        return ordered, {
+            "graded": len(to_grade),
+            "cached": len(responses) - len(to_grade),
+        }
 
     # -- Interview --
 
@@ -257,7 +341,20 @@ class AutoImprove:
 
         self._log("Grading...")
         grader = Grader(verbose=self.verbose)
-        verdicts = await grader.grade_batch(responses, content[:3000], config)
+        grade_cache = self.load_grade_cache()
+        verdicts, stats = await self._grade_with_cache(
+            grader,
+            responses,
+            content[:3000],
+            config,
+            grade_cache,
+        )
+        if stats["graded"] > 0:
+            self.save_grade_cache(grade_cache)
+        self._log(
+            f"  Graded {stats['graded']}/{len(responses)} "
+            f"(cached {stats['cached']})"
+        )
         self._consume_component_usage("grader", grader)
 
         scores = self.scorer.per_question_scores(verdicts)
@@ -286,17 +383,40 @@ class AutoImprove:
                        "Run 'generate' to add more.")
 
         self._log(f"Loop: {iters} iterations, {len(bank)} questions\n")
+        grade_cache = self.load_grade_cache()
 
         # Baseline
         responses = await self.runner.run_batch(skill_content, bank, config.mode,
                                                 style_notes=config.style_notes,
                                                 skill_path=config.skill_path)
         self._consume_component_usage("runner", self.runner)
-        verdicts = await grader.grade_batch(responses, skill_content[:3000], config)
+        baseline_summary = skill_content[:3000]
+        verdicts, base_stats = await self._grade_with_cache(
+            grader,
+            responses,
+            baseline_summary,
+            config,
+            grade_cache,
+        )
+        if base_stats["graded"] > 0:
+            self.save_grade_cache(grade_cache)
+        self._log(
+            f"Baseline grading: graded {base_stats['graded']}/{len(responses)} "
+            f"(cached {base_stats['cached']})"
+        )
         self._consume_component_usage("grader", grader)
         cur_scores = self.scorer.per_question_scores(verdicts)
         cur_verdicts = verdicts
         cur_agg = self.scorer.weighted_mean(cur_scores, bank)
+        prev_grade_keys = {
+            r.get("test_id", ""): Grader.build_grade_key(r, baseline_summary, config)
+            for r in responses
+        }
+        prev_response_hashes = {
+            r.get("test_id", ""): r.get("response_hash", "")
+            for r in responses
+        }
+        prev_verdict_map = {v.test_id: v for v in cur_verdicts}
         self._log(f"Baseline: {cur_agg:.3f}\n")
 
         consec_reverts = 0
@@ -348,7 +468,62 @@ class AutoImprove:
                                                    style_notes=config.style_notes,
                                                    skill_path=config.skill_path)
             self._consume_component_usage("runner", self.runner)
-            new_verd = await grader.grade_batch(new_resp, modified[:3000], config)
+            grading_summary = modified[:3000]
+            new_grade_keys = {
+                r.get("test_id", ""): Grader.build_grade_key(r, grading_summary, config)
+                for r in new_resp
+            }
+
+            carry_forward = {}
+            changed_resp = []
+            hash_changed = 0
+            for resp in new_resp:
+                tid = resp.get("test_id", "")
+                if resp.get("response_hash", "") != prev_response_hashes.get(tid, ""):
+                    hash_changed += 1
+                if new_grade_keys.get(tid) == prev_grade_keys.get(tid) and tid in prev_verdict_map:
+                    carry_forward[tid] = prev_verdict_map[tid]
+                else:
+                    changed_resp.append(resp)
+
+            changed_prev_scores = {
+                r.get("test_id"): cur_scores.get(r.get("test_id"))
+                for r in changed_resp
+                if r.get("test_id") in cur_scores
+            }
+            regraded, grade_stats = await self._grade_with_cache(
+                grader,
+                changed_resp,
+                grading_summary,
+                config,
+                grade_cache,
+                previous_scores=changed_prev_scores,
+            )
+            if grade_stats["graded"] > 0:
+                self.save_grade_cache(grade_cache)
+
+            verdict_map = dict(carry_forward)
+            verdict_map.update({v.test_id: v for v in regraded})
+
+            new_verd = []
+            for resp in new_resp:
+                tid = resp.get("test_id", "")
+                verdict = verdict_map.get(tid)
+                if verdict is None:
+                    verdict = Verdict(
+                        test_id=tid,
+                        grading_tier="error",
+                        composite_score=0.0,
+                        summary="Missing verdict",
+                        flags=["error"],
+                    )
+                new_verd.append(verdict)
+
+            self._log(
+                f"  Re-graded {len(changed_resp)}/{len(new_resp)} "
+                f"(cached {grade_stats['cached']}, carried {len(carry_forward)}, "
+                f"hash-changed {hash_changed})"
+            )
             self._consume_component_usage("grader", grader)
             new_scores = self.scorer.per_question_scores(new_verd)
             new_agg = self.scorer.weighted_mean(new_scores, bank)
@@ -367,6 +542,12 @@ class AutoImprove:
                 self.logger.log(desc, cur_agg, new_agg, True, reason, w_tid, w_sc)
                 cur_scores, cur_verdicts, cur_agg = new_scores, new_verd, new_agg
                 skill_content = modified
+                prev_grade_keys = new_grade_keys
+                prev_response_hashes = {
+                    r.get("test_id", ""): r.get("response_hash", "")
+                    for r in new_resp
+                }
+                prev_verdict_map = {v.test_id: v for v in new_verd}
                 consec_reverts = 0
                 self._log(f"  KEPT ({cur_agg:.3f} -> {new_agg:.3f})")
             else:

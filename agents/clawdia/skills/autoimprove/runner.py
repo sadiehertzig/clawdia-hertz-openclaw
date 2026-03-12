@@ -8,6 +8,7 @@ Modes:
 """
 
 import asyncio
+import hashlib
 import importlib.util
 import inspect
 import os
@@ -29,6 +30,11 @@ class ResponseRunner:
 
     def _track_usage(self, raw_usage: dict | None):
         add_usage(self.token_usage, raw_usage)
+
+    @staticmethod
+    def _response_hash(text: str) -> str:
+        raw = (text or "").replace("\r\n", "\n").strip()
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
     def consume_usage(self) -> dict:
         usage = dict(self.token_usage)
@@ -102,8 +108,12 @@ class ResponseRunner:
                     "test_id": tc.id,
                     "question": tc.question,
                     "response": text,
+                    "response_hash": self._response_hash(text),
                     "key_assertions": tc.key_assertions,
                     "anti_assertions": tc.anti_assertions,
+                    "rubric": tc.rubric,
+                    "test_tier": tc.tier,
+                    "difficulty": tc.difficulty,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "model": model,
                     "mode": "agent_simulation",
@@ -175,8 +185,12 @@ class ResponseRunner:
             return {
                 "test_id": tc.id, "question": tc.question,
                 "response": str(response),
+                "response_hash": self._response_hash(str(response)),
                 "key_assertions": tc.key_assertions,
                 "anti_assertions": tc.anti_assertions,
+                "rubric": tc.rubric,
+                "test_tier": tc.tier,
+                "difficulty": tc.difficulty,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "mode": "direct_invocation",
                 "token_usage": {},
@@ -189,8 +203,12 @@ class ResponseRunner:
         return {
             "test_id": tc.id, "question": tc.question,
             "response": f"ERROR: {msg}",
+            "response_hash": "",
             "key_assertions": tc.key_assertions,
             "anti_assertions": tc.anti_assertions,
+            "rubric": [],
+            "test_tier": tc.tier,
+            "difficulty": tc.difficulty,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "mode": "error",
             "token_usage": {},

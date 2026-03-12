@@ -57,7 +57,7 @@ Generate exactly 10 diverse test questions a real user would ask this \
 skill. Return ONLY a JSON array (no markdown fences, no commentary). \
 Keep each element compact — assertion strings max 80 chars each:
 
-{{"question":"...","intent_class":"short_label","difficulty":"easy|medium|hard|adversarial","key_assertions":["...","..."],"anti_assertions":["..."]}}
+{{"question":"...","intent_class":"short_label","difficulty":"easy|medium|hard|adversarial","key_assertions":["...","..."],"anti_assertions":["..."],"rubric":[{{"criterion":"short testable statement","weight":"high|medium|low"}}]}}
 
 Distribution:
 - 3 easy (common questions, the 80% case)
@@ -68,6 +68,8 @@ and violations of the constraints/safety rules above)
 
 Limit: max 2 key_assertions and 1 anti_assertion per question. \
 Make assertions specific and testable — short but precise.
+Include a rubric of 3-5 concrete criteria per question; keep each criterion \
+short, testable, and directly tied to quality.
 
 JSON array only. No other text."""
 
@@ -85,7 +87,9 @@ Skill context: {skill_summary}
 Generate exactly 3 more test questions that probe the SAME weakness from \
 different angles. Related but not identical.
 
-Return ONLY a JSON array of 3 objects (same schema). No other text."""
+Return ONLY a JSON array of 3 objects (same schema, including rubric). \
+Each rubric should have 3-5 concrete criteria.
+No other text."""
 
 
 class QuestionGenerator:
@@ -135,6 +139,7 @@ class QuestionGenerator:
                 difficulty=q.get("difficulty", "medium"),
                 key_assertions=q.get("key_assertions", []),
                 anti_assertions=q.get("anti_assertions", []),
+                rubric=q.get("rubric", []),
             )
             if tc.question:
                 test_cases.append(tc)
@@ -168,6 +173,7 @@ class QuestionGenerator:
                     difficulty=q.get("difficulty", "hard"),
                     key_assertions=q.get("key_assertions", []),
                     anti_assertions=q.get("anti_assertions", []),
+                    rubric=q.get("rubric", []),
                 )
                 if tc.question:
                     all_new.append(tc)

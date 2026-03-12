@@ -168,9 +168,13 @@ The correct answer should include these elements (key assertions):
 The correct answer must NOT include these things (anti-assertions):
 {anti_assertions}
 
+Additional scoring rubric (compact checklist):
+{rubric}
+
 Instructions:
 - For each key assertion, determine PASS or FAIL with a brief note
 - For each anti-assertion, check if the response violates it
+- Use the rubric checklist to calibrate your scores
 - Score these dimensions from 0.0 to 1.0:
   - factual_accuracy: Are the facts, APIs, references, and claims correct?
   - completeness: Does the response cover all key assertions?
@@ -183,10 +187,10 @@ scores low on factual_accuracy regardless of how well-written it is.
 Return ONLY a JSON object (no markdown fences, no preamble):
 {{
   "assertion_results": [
-    {{"assertion": "...", "pass": true, "note": "..."}}
+    {{"assertion": "...", "pass": true, "note": "<=12 words"}}
   ],
   "anti_assertion_results": [
-    {{"assertion": "...", "violated": false, "note": "..."}}
+    {{"assertion": "...", "violated": false, "note": "<=12 words"}}
   ],
   "scores": {{
     "factual_accuracy": 0.0,
@@ -195,7 +199,8 @@ Return ONLY a JSON object (no markdown fences, no preamble):
     "actionability": 0.0,
     "anti_compliance": 0.0
   }},
-  "concerns": []
+  "flags": [],
+  "confidence": "HIGH|MEDIUM|LOW"
 }}"""
 
 EVAL_ROUND2_SYSTEM = """\
@@ -330,8 +335,10 @@ def _extract_anthropic_usage(data: dict) -> dict:
 
 
 def _call_anthropic_sync(api_key: str, model_id: str,
-                         system: str, user_msg: str) -> tuple[str, dict]:
+                         system: str, user_msg: str,
+                         max_output_tokens: int = 8192) -> tuple[str, dict]:
     """Call Anthropic Messages API."""
+    limit = max(128, int(max_output_tokens or 8192))
     resp = requests.post(
         "https://api.anthropic.com/v1/messages",
         headers={
@@ -341,7 +348,7 @@ def _call_anthropic_sync(api_key: str, model_id: str,
         },
         json={
             "model": model_id,
-            "max_tokens": 8192,
+            "max_tokens": limit,
             "system": system,
             "messages": [{"role": "user", "content": user_msg}],
         },
@@ -454,8 +461,10 @@ def _extract_openai_chat_usage(data: dict) -> dict:
 
 
 def _call_openai_sync(api_key: str, model_id: str,
-                      system: str, user_msg: str) -> tuple[str, dict]:
+                      system: str, user_msg: str,
+                      max_output_tokens: int = 8192) -> tuple[str, dict]:
     """Call OpenAI API (Responses first, Chat Completions fallback)."""
+    limit = max(128, int(max_output_tokens or 8192))
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -471,7 +480,7 @@ def _call_openai_sync(api_key: str, model_id: str,
                 "model": model_id,
                 "instructions": system,
                 "input": user_msg,
-                "max_output_tokens": 8192,
+                "max_output_tokens": limit,
             },
             timeout=120,
         )
@@ -489,7 +498,7 @@ def _call_openai_sync(api_key: str, model_id: str,
             headers=headers,
             json={
                 "model": model_id,
-                "max_completion_tokens": 4096,
+                "max_completion_tokens": min(4096, limit),
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_msg},
@@ -521,8 +530,10 @@ def _extract_google_usage(data: dict) -> dict:
 
 
 def _call_google_sync(api_key: str, model_id: str,
-                      system: str, user_msg: str) -> tuple[str, dict]:
+                      system: str, user_msg: str,
+                      max_output_tokens: int = 8192) -> tuple[str, dict]:
     """Call Google Gemini API."""
+    limit = max(128, int(max_output_tokens or 8192))
     url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
            f"{model_id}:generateContent")
     resp = requests.post(
@@ -534,7 +545,7 @@ def _call_google_sync(api_key: str, model_id: str,
         json={
             "system_instruction": {"parts": [{"text": system}]},
             "contents": [{"parts": [{"text": user_msg}]}],
-            "generationConfig": {"maxOutputTokens": 8192},
+            "generationConfig": {"maxOutputTokens": limit},
         },
         timeout=120,
     )
@@ -675,14 +686,18 @@ class ThreeBodyCouncil:
         if self.verbose:
             print(msg, file=sys.stderr)
 
-    def _call_model_sync(self, key: str, system: str, user_msg: str) -> str:
+    def _call_model_sync(self, key: str, system: str, user_msg: str,
+                         max_output_tokens: int = 8192) -> str:
         """Call a model by its key (anthropic/openai/google). Synchronous."""
         cfg = MODELS[key]
         api_key = self.api_keys[key]
         caller = API_CALLERS[cfg.provider]
         self._log(f"  -> Calling {cfg.name}...")
         try:
-            call_result = caller(api_key, cfg.model_id, system, user_msg)
+            call_result = caller(
+                api_key, cfg.model_id, system, user_msg,
+                max_output_tokens=max_output_tokens,
+            )
             if isinstance(call_result, tuple) and len(call_result) == 2:
                 result, usage = call_result
             else:
@@ -719,11 +734,12 @@ class ThreeBodyCouncil:
         return results
 
     async def _call_model(self, client, key: str,
-                          system: str, user_msg: str) -> str:
+                          system: str, user_msg: str,
+                          max_output_tokens: int = 8192) -> str:
         """Async wrapper: runs sync call in executor."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor, self._call_model_sync, key, system, user_msg
+            _executor, self._call_model_sync, key, system, user_msg, max_output_tokens
         )
 
     async def convene_async(self, question: str) -> dict:
@@ -968,7 +984,8 @@ class ThreeBodyCouncil:
     # ═══════════════════════════════════════════════════════════════════════
 
     async def evaluate_async(self, question, response, skill_summary="",
-                             key_assertions=None, anti_assertions=None):
+                             key_assertions=None, anti_assertions=None,
+                             rubric=None):
         """
         Three-Body Council in evaluation mode.
 
@@ -982,6 +999,7 @@ class ThreeBodyCouncil:
             skill_summary: Brief description of the skill that produced the response
             key_assertions: List of strings -- things the response MUST include
             anti_assertions: List of strings -- things the response must NOT include
+            rubric: Optional compact rubric rows used as additional scoring checklist
 
         Returns:
             dict with keys:
@@ -997,6 +1015,11 @@ class ThreeBodyCouncil:
 
         key_assertions = key_assertions or []
         anti_assertions = anti_assertions or []
+        rubric = rubric or []
+
+        eval_r1_max = 420
+        eval_r2_max = 320
+        eval_synth_max = 260
 
         self._log(f"\n{'='*60}")
         self._log(f"  THREE-BODY COUNCIL — EVALUATION MODE")
@@ -1008,6 +1031,7 @@ class ThreeBodyCouncil:
 
         assertions_str = _json.dumps(key_assertions, indent=2) if key_assertions else "None specified"
         anti_str = _json.dumps(anti_assertions, indent=2) if anti_assertions else "None specified"
+        rubric_str = _json.dumps(rubric, indent=2) if rubric else "None specified"
 
         # ── Round 1: Independent evaluation ──
         self._log("\n--- EVAL ROUND 1: Independent Evaluation ---")
@@ -1022,10 +1046,12 @@ class ThreeBodyCouncil:
                 response=response[:4000],
                 key_assertions=assertions_str,
                 anti_assertions=anti_str,
+                rubric=rubric_str,
             )
             r1_tasks[key] = self._call_model(
                 None, key, system,
-                "Evaluate the response now. Return JSON only."
+                "Evaluate the response now. Return JSON only.",
+                max_output_tokens=eval_r1_max,
             )
 
         r1_results = {}
@@ -1074,7 +1100,8 @@ class ThreeBodyCouncil:
             )
             r2_tasks[key] = self._call_model(
                 None, key, system,
-                "Revise your evaluation now. Return JSON only."
+                "Revise your evaluation now. Return JSON only.",
+                max_output_tokens=eval_r2_max,
             )
 
         r2_results = {}
@@ -1107,7 +1134,8 @@ class ThreeBodyCouncil:
 
         synth_result = await self._call_model(
             None, synth_key, synth_system,
-            "Produce the Three-Body Council's final evaluation verdict now. JSON only."
+            "Produce the Three-Body Council's final evaluation verdict now. JSON only.",
+            max_output_tokens=eval_synth_max,
         )
 
         verdict = self._parse_eval_json(synth_result or "{}")
@@ -1134,11 +1162,11 @@ class ThreeBodyCouncil:
         }
 
     def evaluate(self, question, response, skill_summary="",
-                 key_assertions=None, anti_assertions=None):
+                 key_assertions=None, anti_assertions=None, rubric=None):
         """Synchronous wrapper for evaluate_async."""
         return asyncio.run(self.evaluate_async(
             question, response, skill_summary,
-            key_assertions, anti_assertions
+            key_assertions, anti_assertions, rubric
         ))
 
     def _parse_eval_json(self, text):
