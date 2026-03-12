@@ -1017,9 +1017,9 @@ class ThreeBodyCouncil:
         anti_assertions = anti_assertions or []
         rubric = rubric or []
 
-        eval_r1_max = 420
-        eval_r2_max = 320
-        eval_synth_max = 260
+        eval_r1_max = 1024
+        eval_r2_max = 768
+        eval_synth_max = 768
 
         self._log(f"\n{'='*60}")
         self._log(f"  THREE-BODY COUNCIL — EVALUATION MODE")
