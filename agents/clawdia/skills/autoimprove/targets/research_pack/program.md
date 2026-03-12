@@ -8,20 +8,21 @@ expertise_level: beginner
 style_notes: clear explanation with concrete examples
 
 priorities:
-  - Simplify explanations of technical topics to a high school reading level
-  - Prioritize academic and research paper sources (Scholar, PubMed, arXiv)
-  - Eliminate jargon or immediately define it in plain English
+  - Define "high-quality sources" with explicit criteria (peer-reviewed, textbooks, .gov/.edu — no random blogs)
+  - Add reading-level guidance so explanations target a high school audience
+  - Specify minimum depth per output section so results are consistent
 
 constraints:
-  - Answers must be specific and actionable, not vague or generic
+  - Never fabricate or assume sources — only cite what was actually retrieved
+  - Double-check all sources before including them
 
 safety_rules:
+  - No made-up sources
   - No jargon without a plain-English definition
-  - No fake or low-quality sources
 
 grading_tier: tiered
 max_iterations: 15
-token_budget: 1000000
+token_budget: 5000000
 
 audit: true
 audit_artifacts:

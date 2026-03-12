@@ -12,6 +12,7 @@
 
 ## Session Notes
 - See memory/2026-03-09.md for first live test session details.
+- See memory/2026-03-12-autoimprove.md for full autoimprove session on research_pack.
 
 ## Pending Reminders
 - **2026-03-11 12:00 UTC** — Remind Gregory to switch model priority back to Anthropic after temporary Codex-first failover change.

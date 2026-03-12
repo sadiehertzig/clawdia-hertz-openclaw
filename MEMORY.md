@@ -6,10 +6,10 @@ Long-term knowledge and lessons learned.
 
 - Clawdia Hertz is Sadie's personal AI assistant, built on OpenClaw.
 - The goal is an FRC GatorBots help desk with coding assistance, troubleshooting, and study tools.
-- Skills are published to ClawHub under Sadie's account.
+- Skills are developed locally and published to ClawHub when release-ready.
 - Codex automation is used to implement and audit repository changes.
 
-## Skills published to ClawHub
+## Skills currently in testing (not yet published)
 
 - college-app-essay-coach
 - three-body-council
