@@ -22,6 +22,10 @@ from pathlib import Path
 _SELF_DIR = Path(__file__).resolve().parent
 if str(_SELF_DIR) not in sys.path:
     sys.path.insert(0, str(_SELF_DIR))
+from pathing import resolve_autoimprove_dir, resolve_skills_dir
+
+_SKILLS_DIR = resolve_skills_dir(_SELF_DIR)
+_AUTOIMPROVE_DIR = resolve_autoimprove_dir(_SELF_DIR)
 
 # Load API keys from ~/.openclaw/.env if present
 _ENV_FILE = Path.home() / ".openclaw" / ".env"
@@ -45,7 +49,7 @@ from scorer import Scorer, Ratchet
 from improver import Improver
 from notify import TelegramApproval, apply_approved_skill, discard_proposed_skill
 
-TARGETS_DIR = Path.home() / ".openclaw" / "skills" / "autoimprove" / "targets"
+TARGETS_DIR = _AUTOIMPROVE_DIR / "targets"
 
 
 class AutoImprove:
@@ -634,7 +638,7 @@ async def handle_skill_request(user_input: str, context=None):
     if not hint:
         return "Which skill should I improve? Name it, upload the SKILL.md, or give me the path."
 
-    skills_dir = Path.home() / ".openclaw" / "skills"
+    skills_dir = _SKILLS_DIR
 
     found = None
     if skills_dir.exists():

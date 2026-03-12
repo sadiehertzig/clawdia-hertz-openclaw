@@ -13,57 +13,118 @@ from pathlib import Path
 
 import httpx
 
-# Load config
-_OC_CONFIG = Path.home() / ".openclaw" / "openclaw.json"
+_SELF_DIR = Path(__file__).resolve().parent
+if str(_SELF_DIR) not in sys.path:
+    sys.path.insert(0, str(_SELF_DIR))
+from pathing import resolve_autoimprove_dir
+
+_AUTOIMPROVE_DIR = resolve_autoimprove_dir(_SELF_DIR)
 _ENV_FILE = Path.home() / ".openclaw" / ".env"
+_SESSIONS_FILE = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
+
+
+def _read_env_file() -> dict:
+    values = {}
+    if not _ENV_FILE.exists():
+        return values
+    for raw in _ENV_FILE.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        if key.startswith("export "):
+            key = key[len("export "):].strip()
+        values[key] = val.strip().strip("\"'")
+    return values
+
+
+def _env_value(name: str, env_file: dict) -> str:
+    return (os.environ.get(name, "") or env_file.get(name, "")).strip()
+
+
+def _is_unresolved_template(value: str) -> bool:
+    return value.startswith("${") and value.endswith("}")
+
+
+def _extract_telegram_chat_id(session_key: str) -> str:
+    for marker in ("telegram:group:", "telegram:direct:"):
+        if marker in session_key:
+            return session_key.split(marker, 1)[-1]
+    return ""
+
+
+def _session_timestamp(session_payload) -> int:
+    if not isinstance(session_payload, dict):
+        return 0
+    for field in (
+        "updatedAt",
+        "updated_at",
+        "lastUpdated",
+        "last_updated",
+        "createdAt",
+        "created_at",
+    ):
+        value = session_payload.get(field)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            continue
+    return 0
+
+
+def _detect_active_telegram_chat_id() -> str:
+    if not _SESSIONS_FILE.exists():
+        return ""
+    try:
+        sessions = json.loads(_SESSIONS_FILE.read_text())
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(sessions, dict):
+        return ""
+
+    best_chat_id = ""
+    best_sort_key = (-1, -1)
+    for index, (key, payload) in enumerate(sessions.items()):
+        chat_id = _extract_telegram_chat_id(str(key))
+        if not chat_id:
+            continue
+        sort_key = (_session_timestamp(payload), index)
+        if sort_key > best_sort_key:
+            best_sort_key = sort_key
+            best_chat_id = chat_id
+    return best_chat_id
 
 
 def _load_telegram_config() -> dict:
-    """Load bot token and owner chat ID from OpenClaw config.
+    """Load bot token and destination chat ID.
 
     Env vars (highest priority):
-        OPENCLAW_TELEGRAM_BOT_TOKEN — the bot token
-        OPENCLAW_TELEGRAM_OWNER_CHAT_ID — the owner's chat ID (preferred)
-        OPENCLAW_TELEGRAM_CHAT_ID — fallback chat ID
+        OPENCLAW_TELEGRAM_BOT_TOKEN — required bot token
+        OPENCLAW_TELEGRAM_OWNER_CHAT_ID — optional manual chat override
+        OPENCLAW_TELEGRAM_CHAT_ID — legacy fallback only
     """
-    bot_token = os.environ.get("OPENCLAW_TELEGRAM_BOT_TOKEN", "")
+    env_file = _read_env_file()
+    bot_token = _env_value("OPENCLAW_TELEGRAM_BOT_TOKEN", env_file)
 
-    # Try openclaw.json
-    if not bot_token and _OC_CONFIG.exists():
-        try:
-            cfg = json.loads(_OC_CONFIG.read_text())
-            tg = cfg.get("channels", {}).get("telegram", {})
-            bot_token = bot_token or tg.get("botToken", "")
-            # Check accounts.default too
-            if not bot_token:
-                bot_token = tg.get("accounts", {}).get("default", {}).get("botToken", "")
-        except (json.JSONDecodeError, KeyError):
-            pass
+    if _is_unresolved_template(bot_token):
+        print("WARNING: OPENCLAW_TELEGRAM_BOT_TOKEN is an unresolved template. "
+              "Use a real token in ~/.openclaw/.env. Telegram notifications disabled.",
+              file=sys.stderr)
+        bot_token = ""
 
-    # Validate bot token — real tokens are ~46 chars (e.g. "123456789:AABBccdd...")
+    # Validate bot token — real tokens are usually ~46 chars.
     if bot_token and len(bot_token) < 30:
-        print(f"WARNING: TELEGRAM_BOT_TOKEN looks invalid ({len(bot_token)} chars, "
+        print(f"WARNING: OPENCLAW_TELEGRAM_BOT_TOKEN looks invalid ({len(bot_token)} chars, "
               f"expected ~46). Telegram notifications disabled.", file=sys.stderr)
         bot_token = ""
 
-    # Find the owner's chat ID — auto-detect from active Telegram session,
-    # with env var override for multi-user setups.
-    chat_id = (
-        os.environ.get("OPENCLAW_TELEGRAM_OWNER_CHAT_ID", "")
-        or os.environ.get("OPENCLAW_TELEGRAM_CHAT_ID", "")
-    )
+    # Prefer explicit owner override, otherwise auto-detect active Telegram chat.
+    chat_id = _env_value("OPENCLAW_TELEGRAM_OWNER_CHAT_ID", env_file)
     if not chat_id:
-        # Auto-detect from the active Telegram session
-        sessions_file = Path.home() / ".openclaw" / "agents" / "main" / "sessions" / "sessions.json"
-        if sessions_file.exists():
-            try:
-                sessions = json.loads(sessions_file.read_text())
-                for key in sessions:
-                    if "telegram:direct:" in key:
-                        chat_id = key.split("telegram:direct:")[-1]
-                        break
-            except (json.JSONDecodeError, KeyError):
-                pass
+        chat_id = _detect_active_telegram_chat_id()
+    if not chat_id:
+        chat_id = _env_value("OPENCLAW_TELEGRAM_CHAT_ID", env_file)
 
     return {"bot_token": bot_token, "chat_id": chat_id}
 
@@ -200,7 +261,7 @@ class TelegramApproval:
         offset = 0
 
         # Read current offset so we only get new updates
-        offset_file = Path.home() / ".openclaw" / "skills" / "autoimprove" / "_tg_offset"
+        offset_file = _AUTOIMPROVE_DIR / "_tg_offset"
         if offset_file.exists():
             try:
                 offset = int(offset_file.read_text().strip())

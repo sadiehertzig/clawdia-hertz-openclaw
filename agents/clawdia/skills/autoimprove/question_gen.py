@@ -9,7 +9,6 @@ Channels:
 
 import time
 import sys
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +21,12 @@ from models import (
 )
 
 # Import Three-Body Council
-_TBC_PATH = Path.home() / ".openclaw" / "skills" / "three-body-council"
+_SELF_DIR = Path(__file__).resolve().parent
+if str(_SELF_DIR) not in sys.path:
+    sys.path.insert(0, str(_SELF_DIR))
+from pathing import resolve_three_body_dir
+
+_TBC_PATH = resolve_three_body_dir(_SELF_DIR)
 if str(_TBC_PATH) not in sys.path:
     sys.path.insert(0, str(_TBC_PATH))
 
