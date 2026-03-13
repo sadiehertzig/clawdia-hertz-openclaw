@@ -25,6 +25,12 @@ const JAVA_IMPORTS = {
   vision: [
     'import org.photonvision.PhotonCamera;',
     'import edu.wpi.first.math.geometry.Transform3d;'
+  ],
+  simulation: [
+    'import edu.wpi.first.wpilibj.simulation.SimDeviceSim;',
+    'import edu.wpi.first.hal.SimDouble;',
+    'import edu.wpi.first.wpilibj.simulation.FlywheelSim;',
+    'import edu.wpi.first.math.system.plant.DCMotor;'
   ]
 };
 
@@ -33,7 +39,8 @@ const TEMPLATE_HINTS = {
   autonomous_or_pathing: 'autonomous',
   vision_problem: 'vision',
   build_deploy_error: 'command',
-  sensor_or_can_fault: 'subsystem'
+  sensor_or_can_fault: 'subsystem',
+  simulation_or_halsim: 'simulation'
 };
 
 function inferCodeCategory(intent, userMessage) {
@@ -43,6 +50,7 @@ function inferCodeCategory(intent, userMessage) {
   if (/command|trigger|button|schedule/.test(msg)) return 'command';
   if (/auto|path|trajectory|pose|odometry/.test(msg)) return 'autonomous';
   if (/camera|vision|limelight|photon|april/.test(msg)) return 'vision';
+  if (/simulat|simdevice|simdouble|halsim|mechanism2d|physics sim/.test(msg)) return 'simulation';
   return 'command';
 }
 

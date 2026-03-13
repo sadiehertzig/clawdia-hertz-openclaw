@@ -14,6 +14,7 @@ user-invocable: true
 - `autonomous_or_pathing`
 - `sensor_or_can_fault`
 - `vision_problem`
+- `simulation_or_halsim`
 - `explain_or_review`
 - `deep_debug`
 - `follow_up`
@@ -53,6 +54,7 @@ Priority:
 - `autonomous_or_pathing` -> PatternScout, Librarian, Builder, Checker, Arbiter
 - `sensor_or_can_fault` -> PatternScout, Librarian, Arbiter
 - `vision_problem` -> PatternScout, Librarian, Builder, Checker, Arbiter
+- `simulation_or_halsim` -> PatternScout, Librarian, Builder, Checker, Arbiter
 - `explain_or_review` -> PatternScout, Librarian (+ Arbiter for review/safety hints)
 - `deep_debug` -> PatternScout, Librarian, DeepDebug
 - `follow_up` -> dynamic follow-up policy

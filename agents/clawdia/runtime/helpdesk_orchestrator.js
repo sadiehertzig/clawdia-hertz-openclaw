@@ -18,6 +18,7 @@ const BASE_EXECUTION_PLANS = {
   autonomous_or_pathing: ['patternscout', 'librarian', 'builder', 'checker', 'arbiter'],
   sensor_or_can_fault: ['patternscout', 'librarian', 'arbiter'],
   vision_problem: ['patternscout', 'librarian', 'builder', 'checker', 'arbiter'],
+  simulation_or_halsim: ['patternscout', 'librarian', 'builder', 'checker', 'arbiter'],
   explain_or_review: ['patternscout', 'librarian'],
   deep_debug: ['patternscout', 'librarian', 'deepdebug'],
   follow_up: ['patternscout', 'librarian'],
@@ -29,6 +30,7 @@ const SUBSTANTIVE_INTENTS = new Set([
   'subsystem_or_command_draft',
   'autonomous_or_pathing',
   'vision_problem',
+  'simulation_or_halsim',
   'sensor_or_can_fault',
   'deep_debug'
 ]);

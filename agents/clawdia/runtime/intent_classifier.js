@@ -7,6 +7,7 @@ const INTENTS = [
   'autonomous_or_pathing',
   'sensor_or_can_fault',
   'vision_problem',
+  'simulation_or_halsim',
   'explain_or_review',
   'deep_debug',
   'follow_up',
@@ -72,7 +73,13 @@ const FRC_SIGNAL_PATTERNS = [
   'can bus',
   'can id',
   'canivore',
-  'vision'
+  'vision',
+  'simulate',
+  'simulation',
+  'halsim',
+  'simdevice',
+  'physics sim',
+  'flywheel'
 ];
 
 function safeJsonParse(value) {
@@ -160,7 +167,8 @@ function heuristicIntent(prompt, hints) {
     'can',
     'sensor',
     'review',
-    'debug'
+    'debug',
+    'simulate'
   ]);
 
   if (socialChatter && !technicalIntent) {
@@ -185,6 +193,12 @@ function heuristicIntent(prompt, hints) {
 
   if (includesAny(text, ['camera', 'limelight', 'photonvision', 'vision'])) {
     return 'vision_problem';
+  }
+
+  if (includesAny(text, ['simulate', 'simulation', 'simulatejava', 'simdevice',
+      'simdouble', 'halsim', 'glass sim', 'physics sim', 'mechanism2d',
+      'works in sim', 'sim but not'])) {
+    return 'simulation_or_halsim';
   }
 
   if (hints.safety_or_hardware && includesAny(text, ['fault', 'can', 'sensor', 'brownout', 'overheat', 'wiring'])) {
