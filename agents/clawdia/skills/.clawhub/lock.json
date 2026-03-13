@@ -20,6 +20,38 @@
     "resume-builder": {
       "version": "1.0.0",
       "installedAt": 1772817612119
+    },
+    "self-improving-agent": {
+      "version": "3.0.1",
+      "installedAt": 1773418921876
+    },
+    "summarize": {
+      "version": "1.0.0",
+      "installedAt": 1773418925065
+    },
+    "agent-browser": {
+      "version": "0.2.0",
+      "installedAt": 1773418948490
+    },
+    "github": {
+      "version": "1.0.0",
+      "installedAt": 1773419048000
+    },
+    "self-improving": {
+      "version": "1.2.16",
+      "installedAt": 1773419053732
+    },
+    "nano-pdf": {
+      "version": "1.0.0",
+      "installedAt": 1773419058925
+    },
+    "nano-banana-pro": {
+      "version": "1.0.1",
+      "installedAt": 1773419064205
+    },
+    "openai-whisper": {
+      "version": "1.0.0",
+      "installedAt": 1773419069346
     }
   }
 }
