@@ -210,6 +210,19 @@ class Grader:
         anti_a = response_data.get("anti_assertions", [])
         rubric = self.normalize_rubric(response_data.get("rubric", []))
 
+        # Prepend conversation history to the question for grading context
+        conv_history = response_data.get("conversation_history", [])
+        if conv_history:
+            history_lines = []
+            for turn in conv_history:
+                role = turn.get("role", "user").upper()
+                history_lines.append(f"[{role}]: {turn.get('content', '')}")
+            question = (
+                "CONVERSATION HISTORY (prior turns):\n"
+                + "\n".join(history_lines)
+                + f"\n\n[USER (current turn)]: {question}"
+            )
+
         # Build extra context from config
         extra_context = ""
         if config:

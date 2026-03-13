@@ -74,6 +74,24 @@ class AutoImprove:
         if self.verbose:
             print(msg, file=sys.stderr)
 
+    @staticmethod
+    def _format_edit_history(revert_details: list) -> str:
+        """Format rich edit history with revert reasons for the improver."""
+        if not revert_details:
+            return "None yet."
+        lines = []
+        for entry in revert_details[-5:]:  # last 5 reverts
+            lines.append(
+                f"REVERTED: \"{entry['edit']}\" "
+                f"({entry['agg_before']} -> {entry['agg_after']}, "
+                f"reason: {entry['reason']})"
+            )
+            if entry.get("regressions"):
+                lines.append("  Regressions:")
+                for reg in entry["regressions"]:
+                    lines.append(f"    - {reg}")
+        return "\n".join(lines)
+
     def usage_path(self):
         return self.target_dir / "token_usage.json"
 
@@ -421,6 +439,7 @@ class AutoImprove:
         self._log(f"Baseline: {cur_agg:.3f}\n")
 
         consec_reverts = 0
+        revert_details = []  # list of dicts with rich revert info
         tc_map = {tc.id: tc for tc in bank}
 
         for i in range(iters):
@@ -433,8 +452,24 @@ class AutoImprove:
                 self._log("3 consecutive reverts — stopping")
                 break
 
-            # Build worst-questions payload
-            worst = self.scorer.find_worst(cur_scores, 5)
+            # Build all-scores summary for the improver (Fix 2)
+            all_scores_lines = []
+            for tid, sc in sorted(cur_scores.items(), key=lambda x: -x[1]):
+                tc = tc_map.get(tid, TestCase(id="", question=""))
+                marker = " ⚠ PROTECT" if sc >= 0.80 else ""
+                all_scores_lines.append(
+                    f"  {tid}: {sc:.2f} ({tc.difficulty}){marker}"
+                )
+            all_scores_str = "\n".join(all_scores_lines)
+
+            # Build worst-questions payload (diversify after consecutive reverts)
+            n_worst = 5
+            skip_top = min(consec_reverts, 3)  # after reverts, look deeper
+            all_worst = self.scorer.find_worst(cur_scores, n_worst + skip_top)
+            worst = all_worst[skip_top:]  # skip the questions we keep failing on
+            if not worst:
+                worst = all_worst[:n_worst]
+
             verdict_map = {v.test_id: v for v in cur_verdicts}
             worst_payload = [{
                 "test_id": tid,
@@ -444,10 +479,14 @@ class AutoImprove:
                 "flags": verdict_map.get(tid, Verdict(test_id="")).flags,
             } for tid, sc in worst]
 
+            # Build rich edit history with revert reasons (Fix 1)
+            edit_history = self._format_edit_history(revert_details)
+
             # Propose
             edit = await self.improver.propose(
                 skill_content, config, worst_payload,
-                edit_history=self.logger.tail(10),
+                edit_history=edit_history,
+                all_scores=all_scores_str,
             )
             self._consume_component_usage("improver", self.improver)
             if not edit:
@@ -551,12 +590,30 @@ class AutoImprove:
                 }
                 prev_verdict_map = {v.test_id: v for v in new_verd}
                 consec_reverts = 0
+                revert_details.clear()
                 self._log(f"  KEPT ({prev_agg:.3f} -> {new_agg:.3f})")
             else:
                 # Restore the known-good content to disk (works with or without git)
                 Path(config.skill_path).write_text(skill_content)
                 ratchet.revert()
                 self.logger.log(desc, prev_agg, new_agg, False, reason, w_tid, w_sc)
+                # Record rich revert info for the improver (Fix 1)
+                regressions = []
+                for tid in cur_scores:
+                    before_s = cur_scores.get(tid, 0)
+                    after_s = new_scores.get(tid, 0)
+                    if before_s - after_s > 0.05:
+                        tc = tc_map.get(tid, TestCase(id="", question=""))
+                        regressions.append(
+                            f"{tid} ({tc.intent_class}): {before_s:.2f} -> {after_s:.2f}"
+                        )
+                revert_details.append({
+                    "edit": desc,
+                    "reason": reason,
+                    "agg_before": f"{prev_agg:.3f}",
+                    "agg_after": f"{new_agg:.3f}",
+                    "regressions": regressions,
+                })
                 consec_reverts += 1
                 self._log(f"  REVERTED ({reason})")
 

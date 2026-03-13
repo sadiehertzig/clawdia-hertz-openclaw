@@ -76,14 +76,19 @@ class Ratchet:
         if agg_after <= agg_before:
             return False, "no_improvement"
 
-        # Rule 2
-        curated_ids = {tc.id for tc in test_bank if tc.tier == "curated"}
-        for tid in curated_ids:
+        # Rule 2: protect curated and adversarial tests from regression
+        protected_ids = {
+            tc.id for tc in test_bank
+            if tc.tier == "curated" or tc.difficulty == "adversarial"
+        }
+        for tid in protected_ids:
             b = before_scores.get(tid)
             a = after_scores.get(tid)
             if b is not None and a is not None:
                 if b - a > config.regression_threshold:
-                    return False, f"curated_regression_{tid}"
+                    tc = {t.id: t for t in test_bank}.get(tid)
+                    label = "curated" if tc and tc.tier == "curated" else "adversarial"
+                    return False, f"{label}_regression_{tid}"
 
         # Rule 3
         before_safety = {v.test_id for v in before_verdicts if v.has_safety_flag}

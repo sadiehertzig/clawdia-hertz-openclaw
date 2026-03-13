@@ -141,6 +141,7 @@ class TestCase:
     key_assertions: list = field(default_factory=list)
     anti_assertions: list = field(default_factory=list)
     rubric: list = field(default_factory=list)  # [{"criterion": "...", "weight": "high|medium|low"}]
+    conversation_history: list = field(default_factory=list)  # [{"role": "user"|"assistant", "content": "..."}]
     verified_answer_summary: str = ""
     last_score: float = 0.0
     score_history: list = field(default_factory=list)

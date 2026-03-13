@@ -7,7 +7,7 @@
 - Trivia should be voice-first.
 
 ## Key People
-- Gregory Hertzig (Telegram: 8626043106) — runs Gatorbots Help Desk, main admin
+- Greg Hertzig (Telegram: 8626043106) — runs Gatorbots Help Desk, main admin (prefers "Greg")
 - Sadie Hertzig (Telegram: 8739067231) — group member
 
 ## Session Notes

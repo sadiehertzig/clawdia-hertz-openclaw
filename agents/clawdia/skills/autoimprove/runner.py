@@ -129,6 +129,16 @@ class ResponseRunner:
             f"in this skill file. Be specific, concrete, and actionable.{style_instruction}"
         )
 
+        # Build messages with optional conversation history
+        messages = []
+        if tc.conversation_history:
+            for turn in tc.conversation_history:
+                messages.append({
+                    "role": turn.get("role", "user"),
+                    "content": turn.get("content", ""),
+                })
+        messages.append({"role": "user", "content": tc.question})
+
         async with httpx.AsyncClient() as client:
             try:
                 resp = await send_with_retries(
@@ -144,7 +154,7 @@ class ResponseRunner:
                         "model": model,
                         "max_tokens": 4096,
                         "system": system,
-                        "messages": [{"role": "user", "content": tc.question}],
+                        "messages": messages,
                     },
                     timeout=120.0,
                     max_attempts=4,
@@ -153,7 +163,7 @@ class ResponseRunner:
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
                 text = payload["content"][0]["text"]
-                return {
+                result = {
                     "test_id": tc.id,
                     "question": tc.question,
                     "response": text,
@@ -169,6 +179,9 @@ class ResponseRunner:
                     "token_usage": payload.get("usage", {}),
                     "error": False,
                 }
+                if tc.conversation_history:
+                    result["conversation_history"] = tc.conversation_history
+                return result
             except Exception as e:
                 return self._err(tc, str(e))
 
@@ -208,11 +221,24 @@ class ResponseRunner:
         last_error = "Gemini tool simulation failed"
         total_usage = empty_usage()
 
+        # Build contents with optional conversation history
+        contents = []
+        if tc.conversation_history:
+            for turn in tc.conversation_history:
+                role = turn.get("role", "user")
+                # Gemini uses "model" instead of "assistant"
+                gemini_role = "model" if role == "assistant" else "user"
+                contents.append({
+                    "role": gemini_role,
+                    "parts": [{"text": turn.get("content", "")}],
+                })
+        contents.append({"role": "user", "parts": [{"text": tc.question}]})
+
         async with httpx.AsyncClient() as client:
             for tools in GEMINI_SEARCH_TOOL_OPTIONS + [None]:
                 body = {
                     "system_instruction": {"parts": [{"text": system}]},
-                    "contents": [{"role": "user", "parts": [{"text": tc.question}]}],
+                    "contents": contents,
                     "generationConfig": {"maxOutputTokens": 4096},
                 }
                 if tools is not None:
@@ -245,7 +271,7 @@ class ResponseRunner:
                     text = text.rstrip() + "\n\nSources:\n" + "\n".join(f"- {u}" for u in sources)
 
                 self._track_usage(total_usage)
-                return {
+                result = {
                     "test_id": tc.id,
                     "question": tc.question,
                     "response": text,
@@ -261,6 +287,9 @@ class ResponseRunner:
                     "token_usage": dict(total_usage),
                     "error": False,
                 }
+                if tc.conversation_history:
+                    result["conversation_history"] = tc.conversation_history
+                return result
 
         self._track_usage(total_usage)
         return self._err(tc, last_error)

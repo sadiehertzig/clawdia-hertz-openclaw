@@ -18,7 +18,7 @@ IMPROVER_PROMPT = """\
 You are a skill file improvement agent for OpenClaw.
 
 Make ONE surgical edit to the skill file to improve its ability to answer \
-the failing test questions below.
+the failing test questions below — without regressing any high-scoring tests.
 
 SKILL FILE:
 ---
@@ -36,24 +36,31 @@ CONSTRAINTS (the skill must avoid violating these):
 SAFETY RULES (the skill must NEVER do these):
 {safety_rules}
 
-WORST-SCORING TEST QUESTIONS:
+CURRENT SCORES (protect high-scorers — do NOT regress these):
+{all_scores}
+
+WORST-SCORING TEST QUESTIONS (improve these):
 {worst_questions}
 
-PREVIOUSLY TRIED (avoid repeating):
+PREVIOUSLY TRIED AND REVERTED (learn from these failures):
 {edit_history}
 
 RULES:
-- ONE focused addition per iteration
-- ADD new sections, examples, edge cases, or patterns
-- EXPAND existing content with more detail
-- Do NOT delete or restructure existing content
+- ONE focused edit per iteration
+- You may ADD new sections, examples, edge cases, or patterns
+- You may EXPAND existing content with more detail
+- You may REWRITE an existing section to tighten or clarify its rules \
+(use edit_type "rewrite_section" with section_heading to identify which section)
+- Do NOT delete entire sections without replacement
 - Do NOT touch the YAML front matter or trigger phrases
 - Your edit must directly help at least one failing question
+- Your edit must NOT regress any test currently scoring above 0.80
 - Your edit must NOT violate any constraint or safety rule listed above
-- content_to_add should be valid markdown, ready to insert as-is
+- For add/expand edits: content_to_add should be valid markdown, ready to insert
+- For rewrite edits: content_to_add replaces the identified section's body
 
 Return ONLY a JSON object (no markdown fences, no commentary):
-{{"edit_description":"what and why","edit_type":"add_section|expand_existing|add_example|add_edge_case","insert_after":"exact line from skill file to insert after","content_to_add":"the new content"}}
+{{"edit_description":"what and why","edit_type":"add_section|expand_existing|add_example|add_edge_case|rewrite_section","insert_after":"exact line from skill file to insert after (ignored for rewrite_section)","section_heading":"heading of section to rewrite (only for rewrite_section)","content_to_add":"the new or replacement content"}}
 """
 
 
@@ -152,16 +159,20 @@ class Improver:
         edit_type = str(edit.get("edit_type", "add_section")).strip() or "add_section"
         insert_after = str(edit.get("insert_after", "")).strip()
         content_to_add = str(edit.get("content_to_add", "")).strip()
+        section_heading = str(edit.get("section_heading", "")).strip()
 
         if not content_to_add:
             return None
 
-        return {
+        result = {
             "edit_description": desc or "Add targeted guidance for failing tests",
             "edit_type": edit_type,
             "insert_after": insert_after,
             "content_to_add": content_to_add,
         }
+        if section_heading:
+            result["section_heading"] = section_heading
+        return result
 
     def _parse_edit_response(self, text: str) -> dict | None:
         # Fast path.
@@ -195,6 +206,67 @@ class Improver:
                 return normalized
 
         return None
+
+    @staticmethod
+    def _rewrite_section(content: str, heading: str, new_body: str) -> str | None:
+        """Replace the body of a markdown section, preserving the heading.
+
+        Finds the section by fuzzy-matching heading text. Replaces everything
+        from the line after the heading until the next same-or-higher-level
+        heading (or EOF).
+        """
+        import re as _re
+        lines = content.split("\n")
+        heading_lower = heading.lower().strip().lstrip("#").strip()
+
+        # Find the heading line
+        best_idx = -1
+        best_score = 0.0
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped.startswith("#"):
+                continue
+            line_text = stripped.lstrip("#").strip().lower()
+            if not line_text:
+                continue
+            # Exact match
+            if line_text == heading_lower:
+                best_idx = i
+                best_score = 1.0
+                break
+            # Word overlap
+            hw = set(heading_lower.split())
+            lw = set(line_text.split())
+            if hw and lw:
+                overlap = len(hw & lw) / max(len(hw), len(lw))
+                if overlap > best_score:
+                    best_score = overlap
+                    best_idx = i
+
+        if best_idx < 0 or best_score < 0.5:
+            return None
+
+        # Determine heading level
+        heading_line = lines[best_idx]
+        level = len(heading_line) - len(heading_line.lstrip("#"))
+
+        # Find end of section (next heading at same or higher level, or EOF)
+        end_idx = len(lines)
+        for j in range(best_idx + 1, len(lines)):
+            stripped = lines[j].strip()
+            if stripped.startswith("#"):
+                j_level = len(stripped) - len(stripped.lstrip("#"))
+                if j_level <= level:
+                    end_idx = j
+                    break
+
+        # Rebuild: heading + new body + rest
+        result_lines = lines[:best_idx + 1]
+        result_lines.append("")
+        result_lines.append(new_body)
+        result_lines.append("")
+        result_lines.extend(lines[end_idx:])
+        return "\n".join(result_lines)
 
     @staticmethod
     def _default_anchor(skill_content: str) -> str:
@@ -280,7 +352,8 @@ class Improver:
         raise RuntimeError("Improver model chain is empty")
 
     async def propose(self, skill_content: str, config: AutoImproveConfig,
-                      worst_questions: list, edit_history: str = "") -> dict:
+                      worst_questions: list, edit_history: str = "",
+                      all_scores: str = "") -> dict:
         """
         Propose one edit. Returns dict with edit_description, insert_after,
         content_to_add, etc. Returns deterministic fallback on parse failure.
@@ -294,8 +367,9 @@ class Improver:
             audience=f"{config.audience} ({config.expertise_level})",
             constraints="\n".join(f"- {c}" for c in config.constraints) or "None specified",
             safety_rules="\n".join(f"- {s}" for s in config.safety_rules) or "None specified",
+            all_scores=all_scores or "No scores yet.",
             worst_questions=json.dumps(worst_questions[:5], indent=2),
-            edit_history=edit_history[-2000:] or "None yet.",
+            edit_history=edit_history[-3000:] or "None yet.",
         )
 
         messages = [{"role": "user", "content": prompt}]
@@ -340,6 +414,16 @@ class Improver:
 
         if not new_text:
             return False
+
+        # Handle rewrite_section: replace the body of an existing section
+        if edit.get("edit_type") == "rewrite_section":
+            heading = edit.get("section_heading", "").strip()
+            if heading:
+                result = self._rewrite_section(content, heading, new_text)
+                if result is not None:
+                    Path(skill_path).write_text(result)
+                    return True
+            # Fall through to normal insert if section not found
 
         if not anchor:
             # No anchor — append to end

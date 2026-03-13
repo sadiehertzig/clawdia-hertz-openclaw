@@ -3,6 +3,7 @@
 *.pem
 *.key
 openclaw.json
+.clawhub/
 
 # server runtime / session state
 .openclaw/
