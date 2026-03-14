@@ -63,6 +63,12 @@ export async function createSession(firstName = "Player") {
       tools: TOOL_DEFS,
       tool_choice: "auto",
       input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
+      turn_detection: {
+        type: "server_vad",
+        threshold: 0.8,
+        prefix_padding_ms: 400,
+        silence_duration_ms: 800,
+      },
     }),
   });
 

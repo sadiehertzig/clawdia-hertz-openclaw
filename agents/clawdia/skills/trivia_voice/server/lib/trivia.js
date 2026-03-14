@@ -98,7 +98,9 @@ export class TriviaGame {
     }
 
     const q = this.currentQuestion;
-    const normalized = userAnswer.trim().toUpperCase();
+    // Strip "final answer" prefix if it leaked through from speech
+    const cleaned = userAnswer.replace(/^.*final\s+answer[,:\s]*/i, "").trim();
+    const normalized = cleaned.toUpperCase();
     const correctUpper = q.correctAnswer.toUpperCase();
 
     // 1. Exact match by label (A/B/C/D) or full text
