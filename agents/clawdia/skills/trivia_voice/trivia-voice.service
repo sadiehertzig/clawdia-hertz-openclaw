@@ -1,0 +1,14 @@
+[Unit]
+Description=Trivia Voice Server
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/clawdia-hertz-openclaw/agents/clawdia/skills/trivia_voice/server
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=5
+EnvironmentFile=%h/.openclaw/.env
+
+[Install]
+WantedBy=default.target

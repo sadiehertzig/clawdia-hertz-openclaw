@@ -54,7 +54,7 @@ If an edit fails any rule, it's reverted and the skill stays at its previous bes
 AutoImprove can send proposed changes to Telegram for manual approval before committing. Set your bot token in `~/.openclaw/.env`:
 
 ```
-OPENCLAW_TELEGRAM_BOT_TOKEN=123456789:AABBccddEEff...   # ~46 chars
+OPENCLAW_TELEGRAM_BOT_TOKEN=YOUR_DEFAULT_BOT_TOKEN   # ~46 chars
 ```
 
 The destination chat ID is auto-detected from your active Telegram session — whoever is chatting with the OpenClaw instance gets the notifications. To override, set `OPENCLAW_TELEGRAM_OWNER_CHAT_ID` in your env.

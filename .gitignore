@@ -26,6 +26,9 @@ runtime_state/
 __pycache__/
 *.pyc
 
+# node
+node_modules/
+
 # autoimprove runtime outputs (generated)
 agents/clawdia/skills/autoimprove/targets/
 agents/clawdia/skills/autoimprove/_tg_offset

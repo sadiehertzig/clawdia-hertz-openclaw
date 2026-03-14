@@ -107,9 +107,9 @@ You can override per-provider call order with:
 Set these as environment variables or in `~/.openclaw/.env`:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=AI...
+ANTHROPIC_API_KEY=EXAMPLE_TOKEN
+OPENAI_API_KEY=EXAMPLE_TOKEN
+GEMINI_API_KEY=EXAMPLE_TOKEN
 ```
 
 ### Install via ClawHub

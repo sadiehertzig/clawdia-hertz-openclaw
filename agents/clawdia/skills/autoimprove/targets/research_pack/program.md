@@ -22,7 +22,7 @@ safety_rules:
 
 grading_tier: tiered
 max_iterations: 15
-token_budget: 5000000
+token_budget: 12000000
 
 audit: true
 audit_artifacts:

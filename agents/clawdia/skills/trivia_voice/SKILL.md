@@ -1,46 +1,43 @@
 ---
 name: trivia_voice
-description: Voice-first trivia game. Asks one multiple-choice question, waits for the answer, grades it, keeps score.
+description: Voice-first trivia game via Telegram Mini App.
 user-invocable: true
 ---
 
 # Trivia Voice
 
-## Rules
+## When the user asks for trivia or voice trivia (Telegram)
 
-- Always include [[tts]] in both question and grading replies.
-- If Telegram supports it, include [[audio_as_voice]].
-- Ask one question at a time.
-- Wait for next user message as the answer.
-- Keep a running streak counter in-session.
+Use `web_fetch` to POST to `https://findarticles-demanding-northwest-clerk.trycloudflare.com/api/launch` with:
+- Header: `Content-Type: application/json`
+- Body: `{}`
 
-## Question Flow
+This sends a "Start Voice Trivia" button to the user's Telegram chat. The server knows which chat to send to.
 
-1. Fetch one multiple-choice question from:  
-    https://opentdb.com/api.php?amount=1&type=multiple&encode=url3986  
-    (use web_fetch if available)
+After calling, reply:
+"I just sent you a trivia button — tap 'Start Voice Trivia' to launch the voice game!"
+
+If the web_fetch fails, fall back to text trivia below.
+
+## Text-only fallback (non-Telegram or if voice is unavailable)
+
+1. Fetch one multiple-choice question from:
+   https://opentdb.com/api.php?amount=1&type=multiple&encode=url3986
+   (use web_fetch)
 2. Decode URL encoding.
 3. Shuffle answers.
 4. Label A/B/C/D.
-5. Ask the question using [[tts]].
+5. Ask the question.
 
-## Grading
+### Grading (text mode)
 
-- Accept A/B/C/D (case-insensitive)
-- Accept full answer text if unambiguous
-- If correct:
-  - Say "Correct" with [[tts]]
-  - Add one short fun fact
-- If incorrect:
-  - Say "Not quite"
-  - Reveal correct answer
-  - Add one short explanation
-
-Then ask:  
-"Say next for another."
+- Accept A/B/C/D (case-insensitive) or full answer text
+- If correct: "Correct!" + one short fun fact
+- If incorrect: "Not quite" + reveal correct answer + short explanation
+- Then: "Say next for another."
 
 ## Tone
 
-- Playful
-- Supportive
+- Playful, warm, supportive
 - Light meme seasoning
+- Voice-first: keep it short and punchy
