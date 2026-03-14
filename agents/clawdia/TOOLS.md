@@ -37,4 +37,11 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 ---
 
+## Active Config
+
+### TTS
+- Preferred voice: **nova** (selected 2026-03-14 after voice sampler comparison)
+
+---
+
 Add whatever helps you do your job. This is your cheat sheet.

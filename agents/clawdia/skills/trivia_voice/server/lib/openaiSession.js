@@ -58,7 +58,7 @@ export async function createSession(firstName = "Player") {
     },
     body: JSON.stringify({
       model: "gpt-4o-realtime-preview-2025-06-03",
-      voice: "shimmer",
+      voice: "nova",
       instructions: buildPersonalityPrompt(firstName),
       tools: TOOL_DEFS,
       tool_choice: "auto",
