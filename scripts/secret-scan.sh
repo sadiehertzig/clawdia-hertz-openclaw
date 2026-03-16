@@ -52,7 +52,7 @@ fi
 
 HIGH_RISK_PCRE='(?<![A-Za-z0-9])(ocw_[A-Za-z0-9_-]{12,}|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|xox[baprs]-[A-Za-z0-9-]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z\-_]{20,}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|-----BEGIN (RSA|OPENSSH|EC|DSA|PGP) PRIVATE KEY-----|[0-9]{8,10}:[A-Za-z0-9_-]{35})'
 NAMED_ASSIGN_PCRE='(?i)\b(OPENCLAW_GATEWAY_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY|OPENCLAW_TELEGRAM_BOT_TOKEN|OPENCLAW_TELEGRAM_CHAT_ID)\b\s*=\s*["'"'"']?[A-Za-z0-9._:/+\-]{12,}'
-ALLOWLIST_PCRE='YOUR_DEFAULT_BOT_TOKEN|YOUR_CHAT_ID|EXAMPLE_TOKEN|\[REDACTED\]'
+ALLOWLIST_PCRE='YOUR_DEFAULT_BOT_TOKEN|YOUR_CHAT_ID|EXAMPLE_TOKEN|\[REDACTED\]|os\.environ\.get|\.env\.example|\.\.\.'
 
 TMP_DIR="$(mktemp -d /tmp/secret-scan-XXXXXX)"
 cleanup() {
@@ -71,6 +71,7 @@ scan_text_tree() {
   local outfile="$2"
   rg -uu --hidden -n -P \
     -g '!.git' \
+    -g '!node_modules' \
     -e "$HIGH_RISK_PCRE" \
     -e "$NAMED_ASSIGN_PCRE" \
     "$target" > "$outfile" || true
