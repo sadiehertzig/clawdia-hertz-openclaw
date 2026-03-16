@@ -223,6 +223,21 @@ async function handleRealtimeEvent(event, userId) {
 
     case "response.done":
       document.getElementById("status-text").textContent = "Listening...";
+      // Report token usage to spend tracker
+      if (event.response?.usage) {
+        const u = event.response.usage;
+        fetch(`${API_BASE}/api/log-usage`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": initData,
+          },
+          body: JSON.stringify({
+            input_tokens: u.input_tokens || 0,
+            output_tokens: u.output_tokens || 0,
+          }),
+        }).catch(() => {});
+      }
       break;
 
     case "error":

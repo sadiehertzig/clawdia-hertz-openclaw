@@ -12,6 +12,7 @@ import httpx
 
 from api_utils import send_with_retries
 from models import AutoImproveConfig, DEFAULT_MODEL, parse_json_obj, empty_usage, add_usage
+from spend_tracker import log_usage as log_spend_usage
 
 
 IMPROVER_PROMPT = """\
@@ -332,6 +333,12 @@ class Improver:
                 )
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
+                log_spend_usage(
+                    provider="anthropic",
+                    api_key_label="autoimprove-improver",
+                    model=model_id,
+                    usage=payload.get("usage", {}),
+                )
                 return payload["content"][0]["text"]
             except Exception as e:
                 last_error = e

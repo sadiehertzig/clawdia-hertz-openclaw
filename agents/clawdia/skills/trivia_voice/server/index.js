@@ -49,6 +49,24 @@ app.post("/api/launch", async (req, res) => {
   }
 });
 
+// --- Spend tracker helper ---
+const SPEND_TRACKER_URL = process.env.SPEND_TRACKER_URL || "http://127.0.0.1:9147/log";
+
+function logSpend(model, inputTokens, outputTokens, meta) {
+  fetch(SPEND_TRACKER_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: "openai",
+      api_key_label: "trivia-voice",
+      model,
+      input_tokens: inputTokens || 0,
+      output_tokens: outputTokens || 0,
+      metadata: meta,
+    }),
+  }).catch(() => {}); // fire-and-forget
+}
+
 // --- Session: Mini App calls this to get an ephemeral OpenAI Realtime key ---
 app.post("/api/session", async (req, res) => {
   try {
@@ -63,11 +81,26 @@ app.post("/api/session", async (req, res) => {
     }
 
     const session = await createSession(user.first_name || "Player");
+
     res.json({ client_secret: session.client_secret, user_id: String(user.id) });
   } catch (err) {
     console.error("Session error:", err.message);
     res.status(401).json({ error: err.message });
   }
+});
+
+// --- Usage logging: Mini App reports Realtime API token usage ---
+app.post("/api/log-usage", (req, res) => {
+  try {
+    const initData = req.headers["x-telegram-init-data"] || "";
+    requireTelegramUser(initData, BOT_TOKEN);
+  } catch (err) {
+    return res.status(401).json({ error: err.message });
+  }
+  const clamp = (v) => Math.max(0, Math.min(parseInt(v) || 0, 10_000_000));
+  const { input_tokens, output_tokens } = req.body || {};
+  logSpend("gpt-4o-realtime-preview", clamp(input_tokens), clamp(output_tokens), { event: "session_usage" });
+  res.json({ ok: true });
 });
 
 // --- Tool execution: Mini App proxies Realtime tool calls here ---

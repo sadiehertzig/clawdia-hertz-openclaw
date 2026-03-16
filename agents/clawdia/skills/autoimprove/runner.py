@@ -19,6 +19,7 @@ import httpx
 
 from api_utils import GEMINI_SEARCH_TOOL_OPTIONS, send_with_retries
 from models import TestCase, DEFAULT_MODEL, empty_usage, add_usage
+from spend_tracker import log_usage as log_spend_usage
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -162,6 +163,12 @@ class ResponseRunner:
                 )
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
+                log_spend_usage(
+                    provider="anthropic",
+                    api_key_label="autoimprove-runner-agent-sim",
+                    model=model,
+                    usage=payload.get("usage", {}),
+                )
                 text = payload["content"][0]["text"]
                 result = {
                     "test_id": tc.id,
@@ -261,6 +268,12 @@ class ResponseRunner:
                     continue
 
                 add_usage(total_usage, self._gemini_usage(payload.get("usageMetadata", {})))
+                log_spend_usage(
+                    provider="google",
+                    api_key_label="autoimprove-runner-tool-sim",
+                    model=GEMINI_MODEL,
+                    usage=payload.get("usageMetadata", {}),
+                )
                 text = self._extract_gemini_text(payload)
                 if not text:
                     last_error = "Gemini returned no text response"

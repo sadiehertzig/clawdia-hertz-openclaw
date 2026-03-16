@@ -9,6 +9,7 @@ import os
 import httpx
 
 from api_utils import GEMINI_SEARCH_TOOL_OPTIONS, send_with_retries
+from spend_tracker import log_usage as log_spend_usage
 
 
 FETCH_MAX_CHARS = 15_000
@@ -75,6 +76,12 @@ async def web_search(query: str, count: int = 10) -> dict:
                 continue
 
             payload = resp.json()
+            log_spend_usage(
+                provider="google",
+                api_key_label="autoimprove-tool-executor",
+                model=GEMINI_MODEL,
+                usage=payload.get("usageMetadata", {}),
+            )
             results = _extract_results(payload, count)
             if results:
                 return {"results": results}

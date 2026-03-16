@@ -151,6 +151,26 @@ def main():
                     image.convert('RGB').save(str(output_path), 'PNG')
                 image_saved = True
 
+        # Log usage to spend tracker
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(
+                "usage_logger",
+                str(Path(__file__).resolve().parent.parent.parent / "api-spend-tracker" / "scripts" / "usage_logger.py"),
+            )
+            ul = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(ul)
+            meta = getattr(response, "usage_metadata", None)
+            ul.log_usage(
+                provider="google",
+                api_key_label="nano-banana-pro",
+                model="gemini-3-pro-image-preview",
+                input_tokens=getattr(meta, "prompt_token_count", 0) or 0,
+                output_tokens=getattr(meta, "candidates_token_count", 0) or 0,
+            )
+        except Exception:
+            pass
+
         if image_saved:
             full_path = output_path.resolve()
             print(f"\nImage saved: {full_path}")

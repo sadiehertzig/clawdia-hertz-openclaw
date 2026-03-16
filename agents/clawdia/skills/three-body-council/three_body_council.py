@@ -25,6 +25,15 @@ from typing import Optional
 
 import requests
 
+# Spend tracker integration
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     "..", "api-spend-tracker", "scripts"))
+    from usage_logger import log_usage as _spend_log_usage
+    _SPEND_TRACKER_AVAILABLE = True
+except ImportError:
+    _SPEND_TRACKER_AVAILABLE = False
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MODEL CONFIGURATION
@@ -337,6 +346,8 @@ def _zero_usage() -> dict:
         "input_tokens": 0,
         "output_tokens": 0,
         "total_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
         "calls": 0,
     }
 
@@ -347,6 +358,8 @@ def _normalize_usage(raw_usage: dict | None) -> dict:
     inp = _coerce_int(raw_usage.get("input_tokens"))
     out = _coerce_int(raw_usage.get("output_tokens"))
     total = _coerce_int(raw_usage.get("total_tokens"))
+    cache_read = _coerce_int(raw_usage.get("cache_read_tokens"))
+    cache_write = _coerce_int(raw_usage.get("cache_write_tokens"))
     calls = _coerce_int(raw_usage.get("calls"))
     if total <= 0:
         total = inp + out
@@ -354,23 +367,25 @@ def _normalize_usage(raw_usage: dict | None) -> dict:
         "input_tokens": max(0, inp),
         "output_tokens": max(0, out),
         "total_tokens": max(0, total),
+        "cache_read_tokens": max(0, cache_read),
+        "cache_write_tokens": max(0, cache_write),
         "calls": max(0, calls),
     }
 
 
 def _extract_anthropic_usage(data: dict) -> dict:
     usage = data.get("usage", {}) if isinstance(data, dict) else {}
-    inp = (
-        _coerce_int(usage.get("input_tokens"))
-        + _coerce_int(usage.get("cache_creation_input_tokens"))
-        + _coerce_int(usage.get("cache_read_input_tokens"))
-    )
+    cache_write = _coerce_int(usage.get("cache_creation_input_tokens"))
+    cache_read = _coerce_int(usage.get("cache_read_input_tokens"))
+    inp = _coerce_int(usage.get("input_tokens")) + cache_write + cache_read
     out = _coerce_int(usage.get("output_tokens"))
     total = _coerce_int(usage.get("total_tokens")) or (inp + out)
     return {
         "input_tokens": inp,
         "output_tokens": out,
         "total_tokens": total,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": cache_write,
         "calls": 1,
     }
 
@@ -477,26 +492,34 @@ def _extract_openai_chat_text(data: dict) -> str:
 
 def _extract_openai_responses_usage(data: dict) -> dict:
     usage = data.get("usage", {}) if isinstance(data, dict) else {}
-    inp = _coerce_int(usage.get("input_tokens"))
+    usage_details = usage.get("input_tokens_details", {})
+    cache_read = _coerce_int(usage_details.get("cached_tokens")) if isinstance(usage_details, dict) else 0
+    inp = max(0, _coerce_int(usage.get("input_tokens")) - cache_read)
     out = _coerce_int(usage.get("output_tokens"))
     total = _coerce_int(usage.get("total_tokens")) or (inp + out)
     return {
         "input_tokens": inp,
         "output_tokens": out,
         "total_tokens": total,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": 0,
         "calls": 1,
     }
 
 
 def _extract_openai_chat_usage(data: dict) -> dict:
     usage = data.get("usage", {}) if isinstance(data, dict) else {}
-    inp = _coerce_int(usage.get("prompt_tokens"))
+    usage_details = usage.get("prompt_tokens_details", {})
+    cache_read = _coerce_int(usage_details.get("cached_tokens")) if isinstance(usage_details, dict) else 0
+    inp = max(0, _coerce_int(usage.get("prompt_tokens")) - cache_read)
     out = _coerce_int(usage.get("completion_tokens"))
     total = _coerce_int(usage.get("total_tokens")) or (inp + out)
     return {
         "input_tokens": inp,
         "output_tokens": out,
         "total_tokens": total,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": 0,
         "calls": 1,
     }
 
@@ -559,13 +582,16 @@ def _call_openai_sync(api_key: str, model_id: str,
 
 def _extract_google_usage(data: dict) -> dict:
     usage = data.get("usageMetadata", {}) if isinstance(data, dict) else {}
-    inp = _coerce_int(usage.get("promptTokenCount"))
+    cache_read = _coerce_int(usage.get("cachedContentTokenCount"))
+    inp = max(0, _coerce_int(usage.get("promptTokenCount")) - cache_read)
     out = _coerce_int(usage.get("candidatesTokenCount"))
     total = _coerce_int(usage.get("totalTokenCount")) or (inp + out)
     return {
         "input_tokens": inp,
         "output_tokens": out,
         "total_tokens": total,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": 0,
         "calls": 1,
     }
 
@@ -756,6 +782,19 @@ class ThreeBodyCouncil:
                 else:
                     result, usage = call_result, _zero_usage()
                 self._record_usage(key, usage)
+                if _SPEND_TRACKER_AVAILABLE:
+                    try:
+                        _spend_log_usage(
+                            provider=cfg.provider,
+                            api_key_label=f"council-{key}",
+                            model=model_id,
+                            input_tokens=usage.get("input_tokens", 0),
+                            output_tokens=usage.get("output_tokens", 0),
+                            cache_read_tokens=usage.get("cache_read_tokens", 0),
+                            cache_write_tokens=usage.get("cache_write_tokens", 0),
+                        )
+                    except Exception:
+                        pass
                 self._log(f"  OK {label} responded ({len(result)} chars)")
                 return result
             except Exception as e:

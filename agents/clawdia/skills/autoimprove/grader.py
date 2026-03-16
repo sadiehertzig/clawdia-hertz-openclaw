@@ -37,6 +37,7 @@ from three_body_council import ThreeBodyCouncil
 
 import httpx
 from api_utils import send_with_retries
+from spend_tracker import log_usage as log_spend_usage
 
 
 class Grader:
@@ -338,6 +339,12 @@ class Grader:
                 )
                 payload = resp.json()
                 self._track_usage(payload.get("usage"))
+                log_spend_usage(
+                    provider="anthropic",
+                    api_key_label="autoimprove-grader-quick",
+                    model=DEFAULT_MODEL,
+                    usage=payload.get("usage", {}),
+                )
                 text = payload["content"][0]["text"]
 
             data = parse_json_obj(text) or {}
