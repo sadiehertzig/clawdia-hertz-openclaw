@@ -11,6 +11,6 @@ Long-term knowledge and lessons learned.
 
 ## Skills currently in testing (not yet published)
 
-- college-app-essay-coach
+- college-essay
 - three-body-council
 - autoimprove

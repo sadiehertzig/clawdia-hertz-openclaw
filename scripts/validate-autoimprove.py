@@ -104,8 +104,8 @@ max_iterations: 9
         self.assertIn("Who's the primary audience", second)
 
     def test_pause_command_parsing(self):
-        resp = asyncio.run(autoimprove.handle_skill_request("autoimprove pause research_pack"))
-        self.assertIn("Paused autoimprove target: research_pack", resp)
+        resp = asyncio.run(autoimprove.handle_skill_request("autoimprove pause research-helper"))
+        self.assertIn("Paused autoimprove target: research-helper", resp)
 
     def test_add_and_show_test_bank_commands(self):
         tmp_skill_dir = Path(self.tempdir.name) / "utest-skill"

@@ -11,14 +11,14 @@ clawdia/          — Primary agent
 AGENTS.md, HEARTBEAT.md, IDENTITY.md, MEMORY.md, SOUL.md, TOOLS.md, USER.md
 memory/docs/    — FRC reference docs
 skills/         — ALL SKILLS LIVE HERE
-essay_polish/
-frc_codegen/
-frc_pitcrew/
-frc_triage/
+essay-polish/
+frc-codegen/
+frc-pitcrew/
+frc-triage/
 patternscout/
-quiz_me/
-research_pack/
-trivia_voice/
+quiz-me/
+research-helper/
+voice-trivia/
 AGENTS.md, SOUL.md, TOOLS.md, IDENTITY.md, USER.md, HEARTBEAT.md (root-level configs)
 CLAUDE.md           — This file
 
@@ -39,14 +39,14 @@ Skills follow the OpenClaw/AgentSkills format:
 
 ### Existing Skills
 
-- essay_polish — Essay polishing/editing
-- frc_codegen — FRC robotics code generation
-- frc_pitcrew — FRC pit crew support
-- frc_triage — FRC troubleshooting/triage
+- essay-polish — Essay polishing/editing
+- frc-codegen — FRC robotics code generation
+- frc-pitcrew — FRC pit crew support
+- frc-triage — FRC troubleshooting/triage
 - patternscout — Pattern analysis
-- quiz_me — Quiz generation
-- research_pack — Research assistance
-- trivia_voice — Voice trivia game
+- quiz-me — Quiz generation
+- research-helper — Research assistance
+- voice-trivia — Voice trivia game
 
 ### Installing Community Skills from ClawHub
 
@@ -68,7 +68,7 @@ npx clawhub@latest publish . –slug skill-name –name “Display Name” –ve
 
 ## Safety Rules
 
-The college-app-essay-coach skill (when installed) has strict refusal logic. When editing:
+The college-essay skill (when installed) has strict refusal logic. When editing:
 
 - NEVER weaken the Non-Negotiables or Disallowed Help sections
 - NEVER add capabilities that generate submission-ready essay text

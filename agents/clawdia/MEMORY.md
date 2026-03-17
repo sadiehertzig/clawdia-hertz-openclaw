@@ -12,7 +12,7 @@
 
 ## Session Notes
 - See memory/2026-03-09.md for first live test session details.
-- See memory/2026-03-12-autoimprove.md for full autoimprove session on research_pack.
+- See memory/2026-03-12-autoimprove.md for full autoimprove session on research-helper.
 
 ## Behavioral Rules
 - **Always search before asking.** If I don't know something and I have internet access, look it up — don't ask the user. Asking "who are they playing?" when I could just search is lazy. (Sadie called this out 2026-03-15.)

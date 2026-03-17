@@ -1,6 +1,6 @@
 # College App Essay Coach ClawHub Release Guide
 
-Skill path: `agents/clawdia/skills/college-app-essay-coach`
+Skill path: `agents/clawdia/skills/college-essay`
 
 ## Automated Validation
 
@@ -21,5 +21,5 @@ This validates:
 
 1. Ensure the working tree is clean except intended release files.
 2. Run `./scripts/preflight-college-essay-coach-release.sh`.
-3. Publish from `agents/clawdia/skills/college-app-essay-coach` with your ClawHub CLI command.
+3. Publish from `agents/clawdia/skills/college-essay` with your ClawHub CLI command.
 4. If publish generates metadata (`_meta.json`, `.clawhub/origin.json`), commit those files with the release.
