@@ -1,6 +1,6 @@
 """
 Path resolution helpers for AutoImprove runtime.
-Prefer Clawdia workspace skills over installed skill copies.
+Finds the skills directory via env var or auto-discovery.
 """
 
 import os
@@ -8,20 +8,22 @@ from pathlib import Path
 
 
 def resolve_skills_dir(self_dir: Path) -> Path:
-    """Resolve the canonical skills directory for Clawdia."""
-    override = os.environ.get("OPENCLAW_CLAWDIA_SKILLS_DIR", "").strip()
+    """Resolve the canonical skills directory."""
+    # 1. Explicit env var override
+    override = os.environ.get("OPENCLAW_SKILLS_DIR", "").strip()
+    if not override:
+        override = os.environ.get("OPENCLAW_CLAWDIA_SKILLS_DIR", "").strip()
     if override:
         candidate = Path(override).expanduser()
         if candidate.exists():
             return candidate
 
-    # Preferred workspace location for this repository.
-    workspace_candidate = Path.home() / "clawdia-hertz-openclaw" / "agents" / "clawdia" / "skills"
-    if workspace_candidate.exists():
-        return workspace_candidate
+    # 2. Auto-discover: this skill lives at <skills_dir>/autoimprove/,
+    #    so the parent is the skills directory.
+    if self_dir.parent.exists():
+        return self_dir.parent
 
-    # Fallback to sibling skills directory for portable/manual runs.
-    return self_dir.parent
+    return self_dir
 
 
 def resolve_autoimprove_dir(self_dir: Path) -> Path:

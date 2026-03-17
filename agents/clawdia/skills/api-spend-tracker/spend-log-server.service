@@ -1,10 +1,10 @@
 [Unit]
-Description=Clawdia Spend Tracker Log Server
+Description=OpenClaw Spend Tracker Log Server
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/openclaw/clawdia-hertz-openclaw/agents/clawdia/skills/api-spend-tracker/scripts/log_server.py
+ExecStart=/usr/bin/python3 %h/openclaw/agents/main/skills/api-spend-tracker/scripts/log_server.py
 EnvironmentFile=/home/openclaw/.openclaw/.env
 Restart=on-failure
 RestartSec=5

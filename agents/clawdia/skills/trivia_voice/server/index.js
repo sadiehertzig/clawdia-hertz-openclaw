@@ -146,6 +146,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Trivia Voice server running on http://0.0.0.0:${PORT}`);
   console.log(`Mini App: http://localhost:${PORT}/miniapp/`);
 
-  // Send Mini App launcher button to Sadie's chat
-  sendStartupButton();
+  // Send Mini App launcher button on startup (if chat ID is configured)
+  if (process.env.OPENCLAW_TELEGRAM_CHAT_ID) {
+    sendStartupButton();
+  }
 });

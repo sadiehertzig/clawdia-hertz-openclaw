@@ -3,7 +3,7 @@ import { sendLauncherButton } from "./telegramBotApi.js";
 const CHAT_ID = () => process.env.OPENCLAW_TELEGRAM_CHAT_ID;
 
 /**
- * Send the web_app Mini App button to Sadie's chat on startup.
+ * Send the web_app Mini App button to the configured chat on startup.
  * No polling needed — the gateway owns getUpdates (409 conflict otherwise).
  * The Mini App button opens directly in Telegram's WebView when tapped.
  */

@@ -25,14 +25,22 @@ from typing import Optional
 
 import requests
 
-# Spend tracker integration
+# Spend tracker integration (optional — install api-spend-tracker skill for usage logging)
+_SPEND_TRACKER_AVAILABLE = False
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "..", "api-spend-tracker", "scripts"))
-    from usage_logger import log_usage as _spend_log_usage
-    _SPEND_TRACKER_AVAILABLE = True
+    # Try env var path first, then discover as sibling skill
+    _spend_tracker_dir = os.environ.get("SPEND_TRACKER_SCRIPTS_DIR")
+    if not _spend_tracker_dir:
+        _spend_tracker_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "api-spend-tracker", "scripts"
+        )
+    if os.path.isdir(_spend_tracker_dir):
+        sys.path.insert(0, _spend_tracker_dir)
+        from usage_logger import log_usage as _spend_log_usage
+        _SPEND_TRACKER_AVAILABLE = True
 except ImportError:
-    _SPEND_TRACKER_AVAILABLE = False
+    pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════

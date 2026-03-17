@@ -8,7 +8,7 @@ user-invocable: true
 
 ## When the user asks for trivia or voice trivia (Telegram)
 
-Use `web_fetch` to POST to `https://findarticles-demanding-northwest-clerk.trycloudflare.com/api/launch` with:
+Use `web_fetch` to POST to the Trivia Voice server's `/api/launch` endpoint. The base URL is set via the `TRIVIA_VOICE_BASE_URL` environment variable. POST to `${TRIVIA_VOICE_BASE_URL}/api/launch` with:
 - Header: `Content-Type: application/json`
 - Body: `{}`
 

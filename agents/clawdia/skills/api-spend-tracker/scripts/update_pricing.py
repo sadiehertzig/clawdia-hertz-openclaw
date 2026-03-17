@@ -59,7 +59,7 @@ MODEL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
 def fetch_page_text(url: str) -> str:
     """Fetch a URL and return its text content, stripping HTML tags."""
     resp = requests.get(url, timeout=30, headers={
-        "User-Agent": "Mozilla/5.0 (compatible; ClawdiaPricingBot/1.0)"
+        "User-Agent": "Mozilla/5.0 (compatible; OpenClawPricingBot/1.0)"
     })
     resp.raise_for_status()
     text = resp.text

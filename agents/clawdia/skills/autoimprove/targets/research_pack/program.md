@@ -1,7 +1,7 @@
 # AutoImprove Program — research_pack
 
 target_skill: research_pack
-skill_path: /home/openclaw/clawdia-hertz-openclaw/agents/clawdia/skills/research_pack/SKILL.md
+skill_path: ../../research-helper/SKILL.md
 mode: tool_simulation
 audience: high school students
 expertise_level: beginner

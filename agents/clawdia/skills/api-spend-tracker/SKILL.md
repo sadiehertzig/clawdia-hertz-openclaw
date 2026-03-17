@@ -26,8 +26,10 @@ Track and report API usage costs across all providers.
 The three-body-council skill auto-logs all its API calls. For other skills that use SDK clients directly, use the monkey-patch integration:
 
 ```python
-import sys
-sys.path.insert(0, "/home/openclaw/clawdia-hertz-openclaw/agents/clawdia/skills/api-spend-tracker/scripts")
+import os, sys
+# Auto-discover the spend tracker scripts directory (sibling skill)
+_tracker_dir = os.path.join(os.path.dirname(__file__), "..", "api-spend-tracker", "scripts")
+sys.path.insert(0, _tracker_dir)
 from openclaw_integration import patch_anthropic_client
 patch_anthropic_client(client, api_key_label="my-label")
 ```

@@ -24,7 +24,7 @@ as an automated grading panel.
 
 ## How It Works
 
-1. **Interview** — Clawdia asks what "better" means for the target skill
+1. **Interview** — The bot asks what "better" means for the target skill
 2. **Generate** — Three-Body Council creates test questions automatically
 3. **Baseline** — Score the skill as-is to establish a starting point
 4. **Improve** — Nightly loop: propose edits → grade → keep or revert

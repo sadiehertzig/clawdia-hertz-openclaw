@@ -106,7 +106,7 @@ async function startSession() {
     // Add mic track
     stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
 
-    // Handle remote audio (Clawdia's voice)
+    // Handle remote audio (host's voice)
     const audioEl = document.getElementById("remote-audio");
     peerConnection.ontrack = (event) => {
       audioEl.srcObject = event.streams[0];
@@ -148,7 +148,7 @@ async function startSession() {
     const answerSdp = await sdpRes.text();
     await peerConnection.setRemoteDescription({ type: "answer", sdp: answerSdp });
 
-    // Connection established — Clawdia will greet and start asking questions
+    // Connection established — host will greet and start asking questions
     // (driven by the personality prompt's "on first connect" instruction)
   } catch (err) {
     console.error("Session start error:", err);
@@ -189,11 +189,11 @@ async function handleRealtimeEvent(event, userId) {
           },
         });
 
-        // Trigger Clawdia to respond
+        // Trigger host to respond
         sendDataChannelEvent({ type: "response.create" });
       } catch (err) {
         console.error("Tool call error:", err);
-        // Send error back so Clawdia can recover
+        // Send error back so host can recover
         sendDataChannelEvent({
           type: "conversation.item.create",
           item: {
@@ -217,7 +217,7 @@ async function handleRealtimeEvent(event, userId) {
       break;
 
     case "response.audio.delta":
-      document.getElementById("status-text").textContent = "Clawdia is talking...";
+      document.getElementById("status-text").textContent = "Host is talking...";
       updateAudioBars(true);
       break;
 

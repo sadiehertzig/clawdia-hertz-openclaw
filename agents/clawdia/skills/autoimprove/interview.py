@@ -75,7 +75,7 @@ class InterviewEngine:
         return self.STEPS[self.step_index]["id"]
 
     def get_next_prompt(self) -> str:
-        """Get the next question Clawdia should ask."""
+        """Get the next question the bot should ask."""
         if self.is_complete():
             return ""
 

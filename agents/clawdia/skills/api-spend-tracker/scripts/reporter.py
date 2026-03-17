@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Daily API Spend Reporter for Clawdia.
+Daily API Spend Reporter for OpenClaw.
 Queries local SQLite for the last 24 hours, formats a Telegram digest, and sends it.
 
 Cron target: runs daily at 8:00 AM ET.
@@ -84,7 +84,7 @@ def format_telegram_message(key_totals: list[dict], model_details: list[dict], h
     total_tokens = sum(r["total_tokens"] for r in key_totals)
 
     lines = []
-    lines.append(f"\U0001f4b0 CLAWDIA DAILY API SPEND")
+    lines.append(f"\U0001f4b0 OPENCLAW DAILY API SPEND")
     lines.append(f"\U0001f4c5 {date_str} (last {hours}h)")
     lines.append("\u2500" * 30)
     lines.append("")
@@ -126,7 +126,7 @@ def format_telegram_message(key_totals: list[dict], model_details: list[dict], h
     # Zero-usage case
     if not key_totals:
         lines = [
-            "\U0001f4b0 CLAWDIA DAILY API SPEND",
+            "\U0001f4b0 OPENCLAW DAILY API SPEND",
             f"\U0001f4c5 {date_str} (last {hours}h)",
             "",
             "\u2705 No API usage recorded in the last 24h.",
@@ -182,7 +182,7 @@ def run_report(hours: int = 24, test_mode: bool = False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Clawdia Daily API Spend Reporter")
+    parser = argparse.ArgumentParser(description="OpenClaw Daily API Spend Reporter")
     parser.add_argument("--test", action="store_true", help="Preview message without sending")
     parser.add_argument("--hours", type=int, default=24, help="Lookback window (default: 24)")
     args = parser.parse_args()
