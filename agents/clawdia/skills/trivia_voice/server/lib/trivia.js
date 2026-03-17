@@ -1,5 +1,9 @@
 import { categoryIdFor } from "./categories.js";
 
+const DEFAULT_QUESTION_MODE = "open_ended";
+const QUESTION_MODES = new Set(["open_ended", "multiple_choice"]);
+const FINAL_ANSWER_REGEX = /final\s+answer[\s,:-]*(.+)/i;
+
 /** Fetch a single multiple-choice question from OpenTDB. */
 async function fetchQuestion({ category = null, difficulty = null } = {}) {
   let url = "https://opentdb.com/api.php?amount=1&type=multiple&encode=url3986";
@@ -67,6 +71,20 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
+function normalizeMode(mode) {
+  return QUESTION_MODES.has(mode) ? mode : DEFAULT_QUESTION_MODE;
+}
+
+function parseFinalSubmission(rawAnswer) {
+  const raw = String(rawAnswer || "").trim();
+  if (!raw) return null;
+  const match = raw.match(FINAL_ANSWER_REGEX);
+  if (!match) return null;
+  const extracted = (match[1] || "").trim();
+  if (!extracted) return null;
+  return extracted;
+}
+
 /** In-memory per-user trivia game state. */
 export class TriviaGame {
   constructor(userId) {
@@ -76,11 +94,13 @@ export class TriviaGame {
     this.streak = 0;
     this.totalAsked = 0;
     this.totalCorrect = 0;
-    this.preferences = { category: null, difficulty: null };
+    this.preferences = { category: null, difficulty: null, question_mode: DEFAULT_QUESTION_MODE };
   }
 
   async askQuestion() {
     const q = await fetchQuestion(this.preferences);
+    const questionMode = normalizeMode(this.preferences.question_mode);
+    q.questionMode = questionMode;
     this.currentQuestion = q;
     this.totalAsked++;
     // Return sanitized version — no correct answer exposed
@@ -88,7 +108,10 @@ export class TriviaGame {
       question: q.question,
       category: q.category,
       difficulty: q.difficulty,
-      options: q.options.map(({ label, text }) => ({ label, text })),
+      question_mode: questionMode,
+      options: questionMode === "multiple_choice"
+        ? q.options.map(({ label, text }) => ({ label, text }))
+        : [],
     };
   }
 
@@ -98,14 +121,38 @@ export class TriviaGame {
     }
 
     const q = this.currentQuestion;
-    // Strip "final answer" prefix if it leaked through from speech
-    const cleaned = userAnswer.replace(/^.*final\s+answer[,:\s]*/i, "").trim();
+    const questionMode = normalizeMode(q.questionMode);
+    const cleaned = parseFinalSubmission(userAnswer);
+    if (!cleaned) {
+      return {
+        ok: false,
+        needs_final_answer: true,
+        question_mode: questionMode,
+        reminder: questionMode === "multiple_choice"
+          ? 'Say "final answer" and your letter, like "final answer, B".'
+          : 'Say "final answer" and your answer, like "final answer, Paris".',
+        score: this.score,
+        streak: this.streak,
+      };
+    }
+
+    if (questionMode === "open_ended" && cleaned.length < 2) {
+      return {
+        ok: false,
+        needs_final_answer: true,
+        question_mode: questionMode,
+        reminder: 'For open-ended mode, say "final answer" and the full answer text.',
+        score: this.score,
+        streak: this.streak,
+      };
+    }
+
     const normalized = cleaned.toUpperCase();
     const correctUpper = q.correctAnswer.toUpperCase();
 
     // 1. Exact match by label (A/B/C/D) or full text
     let isCorrect =
-      normalized === q.correctLabel ||
+      (questionMode === "multiple_choice" && normalized === q.correctLabel) ||
       normalized === correctUpper ||
       q.options.some((o) => o.correct && normalized === o.text.toUpperCase());
 
@@ -147,7 +194,10 @@ export class TriviaGame {
 
     const result = {
       correct: isCorrect,
-      correctAnswer: `${q.correctLabel}. ${q.correctAnswer}`,
+      question_mode: questionMode,
+      correctAnswer: questionMode === "multiple_choice"
+        ? `${q.correctLabel}. ${q.correctAnswer}`
+        : q.correctAnswer,
       score: this.score,
       streak: this.streak,
     };
@@ -167,9 +217,10 @@ export class TriviaGame {
     };
   }
 
-  setPreferences({ category, difficulty }) {
+  setPreferences({ category, difficulty, question_mode } = {}) {
     if (category !== undefined) this.preferences.category = category === "random" ? null : category;
     if (difficulty !== undefined) this.preferences.difficulty = difficulty === "any" ? null : difficulty;
+    if (question_mode !== undefined) this.preferences.question_mode = normalizeMode(question_mode);
     return { ok: true, preferences: { ...this.preferences } };
   }
 

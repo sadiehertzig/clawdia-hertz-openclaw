@@ -10,11 +10,11 @@ const TOOL_DEFS = [
   {
     type: "function",
     name: "grade_answer",
-    description: "Grade the player's answer. Pass ONLY the answer letter (A, B, C, or D) or the answer text itself. Strip filler words, preamble, and conversational fluff — just the core answer.",
+    description: "Grade the player's answer. Pass the player's exact final submission phrase, including the words 'final answer' (e.g. 'final answer, B' or 'final answer, Paris'). Do not paraphrase.",
     parameters: {
       type: "object",
       properties: {
-        user_answer: { type: "string", description: "The answer letter (A/B/C/D) or the answer text only — no filler words" },
+        user_answer: { type: "string", description: "The player's exact final submission phrase including 'final answer'" },
       },
       required: ["user_answer"],
     },
@@ -34,6 +34,7 @@ const TOOL_DEFS = [
       properties: {
         category: { type: "string", description: "Category name (e.g. science, geography, history) or 'random'" },
         difficulty: { type: "string", enum: ["easy", "medium", "hard", "any"] },
+        question_mode: { type: "string", enum: ["open_ended", "multiple_choice"] },
       },
     },
   },
@@ -65,9 +66,9 @@ export async function createSession(firstName = "Player") {
       input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
       turn_detection: {
         type: "server_vad",
-        threshold: 0.8,
-        prefix_padding_ms: 400,
-        silence_duration_ms: 800,
+        threshold: 0.9,
+        prefix_padding_ms: 500,
+        silence_duration_ms: 1200,
       },
     }),
   });

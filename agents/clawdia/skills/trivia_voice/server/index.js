@@ -33,7 +33,11 @@ app.get("/api/health", (_req, res) => {
 
 // --- Categories list (Mini App fetches on load) ---
 app.get("/api/categories", (_req, res) => {
-  res.json({ categories: CATEGORY_NAMES, difficulties: DIFFICULTIES });
+  res.json({
+    categories: CATEGORY_NAMES,
+    difficulties: DIFFICULTIES,
+    question_modes: ["open_ended", "multiple_choice"],
+  });
 });
 
 // --- Launch: send Mini App button to a chat (called via tunnel URL) ---
@@ -72,12 +76,12 @@ app.post("/api/session", async (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] || "";
     const user = requireTelegramUser(initData, BOT_TOKEN);
-    const { category, difficulty } = req.body || {};
+    const { category, difficulty, question_mode } = req.body || {};
 
     // Set preferences on the game instance before creating the session
     const game = getOrCreateGame(String(user.id));
-    if (category || difficulty) {
-      game.setPreferences({ category, difficulty });
+    if (category !== undefined || difficulty !== undefined || question_mode !== undefined) {
+      game.setPreferences({ category, difficulty, question_mode });
     }
 
     const session = await createSession(user.first_name || "Player");

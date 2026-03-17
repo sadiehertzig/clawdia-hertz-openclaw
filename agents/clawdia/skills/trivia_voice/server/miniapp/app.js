@@ -11,6 +11,14 @@ let peerConnection = null;
 let dataChannel = null;
 let selectedCategory = "random";
 let selectedDifficulty = "any";
+let selectedQuestionMode = "open_ended";
+
+const MIC_CONSTRAINTS = {
+  echoCancellation: { ideal: true },
+  noiseSuppression: { ideal: true },
+  autoGainControl: { ideal: true },
+  channelCount: { ideal: 1 },
+};
 
 // --- DOM refs ---
 const screens = {
@@ -31,7 +39,7 @@ function showScreen(name) {
 async function initSetup() {
   try {
     const res = await fetch(`${API_BASE}/api/categories`);
-    const { categories, difficulties } = await res.json();
+    const { categories, difficulties, question_modes: questionModes = ["open_ended", "multiple_choice"] } = await res.json();
 
     const catPicker = document.getElementById("category-picker");
     // Add "Random" option first
@@ -44,6 +52,16 @@ async function initSetup() {
     diffPicker.innerHTML = makePill("any", "Any", true);
     difficulties.forEach((d) => {
       diffPicker.innerHTML += makePill(d, d, false);
+    });
+
+    const modePicker = document.getElementById("mode-picker");
+    modePicker.innerHTML = "";
+    questionModes.forEach((mode) => {
+      modePicker.innerHTML += makePill(
+        mode,
+        mode === "multiple_choice" ? "Multiple Choice" : "Open Ended",
+        mode === selectedQuestionMode
+      );
     });
 
     // Pill click handlers
@@ -62,6 +80,14 @@ async function initSetup() {
       pill.classList.add("selected");
       selectedDifficulty = pill.dataset.value;
     });
+
+    modePicker.addEventListener("click", (e) => {
+      const pill = e.target.closest(".pill");
+      if (!pill) return;
+      modePicker.querySelectorAll(".pill").forEach((p) => p.classList.remove("selected"));
+      pill.classList.add("selected");
+      selectedQuestionMode = pill.dataset.value;
+    });
   } catch (err) {
     console.error("Failed to load categories:", err);
   }
@@ -74,10 +100,16 @@ function makePill(value, label, selected) {
 // --- Start voice session ---
 async function startSession() {
   showScreen("connecting");
+  let stream = null;
 
   try {
     // 1. Get microphone
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS });
+    } catch (constraintErr) {
+      console.warn("Mic constraints not supported, falling back to default audio capture.", constraintErr);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
 
     // 2. Get ephemeral session from our server
     const sessionRes = await fetch(`${API_BASE}/api/session`, {
@@ -89,6 +121,7 @@ async function startSession() {
       body: JSON.stringify({
         category: selectedCategory,
         difficulty: selectedDifficulty,
+        question_mode: selectedQuestionMode,
       }),
     });
 
@@ -152,6 +185,7 @@ async function startSession() {
     // (driven by the personality prompt's "on first connect" instruction)
   } catch (err) {
     console.error("Session start error:", err);
+    if (stream) stream.getTracks().forEach((t) => t.stop());
     showError(err.message);
   }
 }
@@ -260,10 +294,12 @@ function updateUIFromTool(toolName, result) {
   if (toolName === "grade_answer" && result.score !== undefined) {
     document.getElementById("streak-display").textContent = result.streak;
     document.getElementById("score-display").textContent = `Score: ${result.score}`;
-    // Streak highlight animation
-    const streakEl = document.getElementById("streak-display");
-    streakEl.style.transform = "scale(1.3)";
-    setTimeout(() => { streakEl.style.transform = "scale(1)"; }, 300);
+    if (typeof result.correct === "boolean") {
+      // Streak highlight animation
+      const streakEl = document.getElementById("streak-display");
+      streakEl.style.transform = "scale(1.3)";
+      setTimeout(() => { streakEl.style.transform = "scale(1)"; }, 300);
+    }
   }
 
   if (toolName === "get_status" && result.score !== undefined) {
