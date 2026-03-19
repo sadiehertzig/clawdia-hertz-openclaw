@@ -54,17 +54,21 @@ Skills follow the OpenClaw/AgentSkills format:
 
 ### Existing Skills
 
-Skills include both local folders and symlinked skills that resolve into `/home/openclaw/copylobsta/agents/main/skills/`.
+All skills live as real directories in `agents/clawdia/skills/`. Copylobsta
+(`/home/openclaw/copylobsta/agents/main/skills/`) symlinks back here to avoid
+drift until skills are deployed independently. **Do not reverse the symlink
+direction** — Clawdia must own the real files so that `Path.resolve()` and git
+operations stay inside this repo.
 
 - academic-deep-research
 - agent-browser
-- api-spend-tracker (symlink)
+- api-spend-tracker
 - autoimprove
-- autoimprove-tbc (symlink)
-- code-tutor (symlink)
-- college-essay (symlink)
-- copylobsta (symlink)
-- creative-writing (symlink)
+- autoimprove-tbc
+- code-tutor
+- college-essay
+- copylobsta
+- creative-writing
 - essay-polish
 - frc-codegen
 - frc-pitcrew
@@ -73,10 +77,10 @@ Skills include both local folders and symlinked skills that resolve into `/home/
 - github
 - nano-banana-pro
 - nano-pdf
-- notes-quiz (symlink)
+- notes-quiz
 - openai-whisper
 - patternscout
-- quiz-me (symlink)
+- quiz-me
 - repo_brain
 - research-paper-writer
 - resume-builder
@@ -84,8 +88,8 @@ Skills include both local folders and symlinked skills that resolve into `/home/
 - self-improving-agent
 - study-habits
 - summarize
-- three-body-council (symlink)
-- voice-trivia (symlink)
+- three-body-council
+- voice-trivia
 
 ### Installing Community Skills from ClawHub
 
