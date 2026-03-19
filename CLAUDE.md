@@ -17,15 +17,30 @@ frc-pitcrew/
 frc-triage/
 patternscout/
 quiz-me/
-research-helper/
+academic-deep-research/
 voice-trivia/
 AGENTS.md, SOUL.md, TOOLS.md, IDENTITY.md, USER.md, HEARTBEAT.md (root-level configs)
 CLAUDE.md           — This file
 
 ## Agents
 
-Clawdia is the primary agent. Her skills are in agents/clawdia/skills/.
-Arbiter is the FRC robotics coding assistant with reference docs for WPILib, PathPlanner, REV Spark, CTRE Phoenix6, and deploy checklists.
+Current agent directories:
+- arbiter
+- builder
+- checker
+- clawdia
+- deepdebug
+- librarian
+
+Clawdia is the primary agent. Her skills are in `agents/clawdia/skills/`.
+
+## Workspace Canonical Path
+
+- Canonical workspace: `/home/openclaw/clawdia-hertz-openclaw`
+- Legacy ubuntu workspace path is retired and must not be used in active configs/scripts.
+- Ubuntu copy is rollback archive only for 7 days:
+  - `/home/ubuntu/archive/clawdia-hertz-openclaw-20260319-154316`
+- Guardrail: run `scripts/check-no-legacy-ubuntu-path.sh` before shipping path-related changes.
 
 ## Skills
 
@@ -39,14 +54,38 @@ Skills follow the OpenClaw/AgentSkills format:
 
 ### Existing Skills
 
-- essay-polish — Essay polishing/editing
-- frc-codegen — FRC robotics code generation
-- frc-pitcrew — FRC pit crew support
-- frc-triage — FRC troubleshooting/triage
-- patternscout — Pattern analysis
-- quiz-me — Quiz generation
-- research-helper — Research assistance
-- voice-trivia — Voice trivia game
+Skills include both local folders and symlinked skills that resolve into `/home/openclaw/copylobsta/agents/main/skills/`.
+
+- academic-deep-research
+- agent-browser
+- api-spend-tracker (symlink)
+- autoimprove
+- autoimprove-tbc (symlink)
+- code-tutor (symlink)
+- college-essay (symlink)
+- copylobsta (symlink)
+- creative-writing (symlink)
+- essay-polish
+- frc-codegen
+- frc-pitcrew
+- frc-triage
+- frontend-design
+- github
+- nano-banana-pro
+- nano-pdf
+- notes-quiz (symlink)
+- openai-whisper
+- patternscout
+- quiz-me (symlink)
+- repo_brain
+- research-paper-writer
+- resume-builder
+- self-improving
+- self-improving-agent
+- study-habits
+- summarize
+- three-body-council (symlink)
+- voice-trivia (symlink)
 
 ### Installing Community Skills from ClawHub
 
