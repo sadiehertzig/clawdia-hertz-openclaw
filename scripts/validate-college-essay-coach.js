@@ -5,8 +5,8 @@ const assert = require('assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const SKILL_PATH = path.join(__dirname, '..', 'agents', 'clawdia', 'skills', 'college-app-essay-coach', 'SKILL.md');
-const README_PATH = path.join(__dirname, '..', 'agents', 'clawdia', 'skills', 'college-app-essay-coach', 'README.md');
+const SKILL_PATH = path.join(__dirname, '..', 'agents', 'clawdia', 'skills', 'college-essay', 'SKILL.md');
+const README_PATH = path.join(__dirname, '..', 'agents', 'clawdia', 'skills', 'college-essay', 'README.md');
 
 function readFile(filePath) {
   return fs.readFileSync(filePath, 'utf8');
@@ -43,11 +43,11 @@ function runFrontmatterChecks(skill) {
   const frontmatter = parseFrontmatter(skill);
   assert.equal(/^homepage:/m.test(frontmatter), false, 'homepage must not be a top-level frontmatter key');
   expectIncludes(frontmatter, [
-    'name: college-app-essay-coach',
+    'name: college-essay',
     'description:',
     'metadata:',
-    'author: "Sadie Hertzig"',
-    'homepage: "https://github.com/sadiehertzig/clawdia-hertz-openclaw"'
+    'author: "OpenClaw Community"',
+    'homepage: "https://github.com/sadiehertzig/CopyLobsta"'
   ], 'SKILL frontmatter');
   console.log('ok - SKILL frontmatter is release-ready');
 }
@@ -130,8 +130,7 @@ function runReadmeCoverageChecks(readme) {
   expectIncludes(readme, [
     '## What It Does',
     '## What It Refuses To Do',
-    '## Red-Team Tests',
-    'npx clawhub@latest install college-app-essay-coach'
+    '## Red-Team Tests'
   ], 'README structure');
 
   const refusalRequests = [

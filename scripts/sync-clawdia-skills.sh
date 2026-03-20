@@ -20,7 +20,7 @@ Options:
   --check           Do not copy files; print drift and exit non-zero if drift exists
   --no-restart      Skip gateway restart after successful sync
   --skill NAME      Sync/check one skill (repeatable). Default:
-                    autoimprove, three-body-council
+                    autoimprove-tbc, three-body-council
   -h, --help        Show this message
 
 Env overrides:
@@ -66,7 +66,7 @@ if ! command -v rsync >/dev/null 2>&1; then
 fi
 
 if [[ ${#SKILLS[@]} -eq 0 ]]; then
-  SKILLS=("autoimprove" "three-body-council")
+  SKILLS=("autoimprove-tbc" "three-body-council")
 fi
 
 if [[ ! -d "$SRC_ROOT" ]]; then

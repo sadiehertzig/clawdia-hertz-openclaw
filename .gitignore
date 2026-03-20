@@ -11,7 +11,6 @@ openclaw.json
 
 # agent memory and transient state
 agents/*/memory/
-!agents/*/memory/
 !agents/*/memory/docs/
 !agents/*/memory/docs/**
 agents/*/data/
@@ -28,10 +27,15 @@ __pycache__/
 
 # node
 node_modules/
+/package-lock.json
 
-# autoimprove runtime outputs (generated)
-agents/clawdia/skills/autoimprove/targets/
-agents/clawdia/skills/autoimprove/_tg_offset
+# root runtime logs
+/logs/*.log
+
+# autoimprove-tbc runtime outputs (generated)
+agents/clawdia/skills/autoimprove-tbc/targets/
+agents/clawdia/skills/autoimprove-tbc/_tg_offset
 
 # agent mirrors
 mirrors/
+tmp/
