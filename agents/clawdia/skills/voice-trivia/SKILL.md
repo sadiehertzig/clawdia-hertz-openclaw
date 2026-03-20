@@ -10,6 +10,7 @@ user-invocable: true
 
 Use `web_fetch` to POST to the Trivia Voice server's `/api/launch` endpoint. The base URL is set via the `TRIVIA_VOICE_BASE_URL` environment variable. POST to `${TRIVIA_VOICE_BASE_URL}/api/launch` with:
 - Header: `Content-Type: application/json`
+- Header: `Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}`
 - Body: `{}`
 
 This sends a "Start Voice Trivia" button to the user's Telegram chat. The server knows which chat to send to.

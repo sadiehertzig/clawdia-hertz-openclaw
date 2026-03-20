@@ -4,8 +4,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/copylobsta/agents/main/skills/voice-trivia/server
-# Edit WorkingDirectory if your repo is not at ~/copylobsta
+WorkingDirectory=%h/clawdia-hertz-openclaw/agents/clawdia/skills/voice-trivia/server
 ExecStart=/usr/bin/node index.js
 Restart=always
 RestartSec=5

@@ -19,6 +19,8 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.TRIVIA_PORT || 3456;
 const BOT_TOKEN = process.env.OPENCLAW_TELEGRAM_BOT_TOKEN;
 
+const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -38,6 +40,10 @@ app.get("/api/categories", (_req, res) => {
 
 // --- Launch: send Mini App button to a chat (called via tunnel URL) ---
 app.post("/api/launch", async (req, res) => {
+  const token = req.headers["authorization"]?.replace("Bearer ", "");
+  if (!GATEWAY_TOKEN || token !== GATEWAY_TOKEN) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
   try {
     const chatId = req.body?.chat_id || process.env.OPENCLAW_TELEGRAM_CHAT_ID;
     if (!chatId) return res.status(400).json({ error: "missing chat_id" });
@@ -142,8 +148,8 @@ app.post("/api/tool", async (req, res) => {
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Trivia Voice server running on http://0.0.0.0:${PORT}`);
+app.listen(PORT, "127.0.0.1", () => {
+  console.log(`Trivia Voice server running on http://127.0.0.1:${PORT}`);
   console.log(`Mini App: http://localhost:${PORT}/miniapp/`);
 
   // Send Mini App launcher button on startup (if chat ID is configured)
