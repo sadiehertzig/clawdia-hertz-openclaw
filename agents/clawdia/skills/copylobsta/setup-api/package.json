@@ -1,7 +1,15 @@
 {
   "name": "copylobsta-setup-api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Temporary setup API on friend's instance — validates keys and writes to Secrets Manager",
+  "license": "MIT",
+  "author": "OpenClaw",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/clawdia-hertz-openclaw",
+    "directory": "agents/clawdia/skills/copylobsta/setup-api"
+  },
+  "keywords": ["openclaw", "copylobsta", "aws", "setup", "secrets-manager"],
   "type": "module",
   "scripts": {
     "build": "tsc",
