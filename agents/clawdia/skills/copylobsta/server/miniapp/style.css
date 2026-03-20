@@ -543,3 +543,51 @@ code {
   font-size: 13px;
   font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
 }
+
+/* --- Advanced collapsible section --- */
+.advanced-toggle {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  list-style: none;
+}
+.advanced-toggle::-webkit-details-marker {
+  display: none;
+}
+.advanced-toggle::before {
+  content: "\25B6";
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+details[open] > .advanced-toggle::before {
+  transform: rotate(90deg);
+}
+.advanced-body {
+  margin-top: 12px;
+}
+.advanced-body p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+/* --- Code block --- */
+.code-block {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.code-block code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}

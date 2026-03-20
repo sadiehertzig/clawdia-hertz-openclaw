@@ -606,11 +606,20 @@ document.getElementById("btn-cfn-launch")?.addEventListener("click", handleCfnLa
 document.getElementById("btn-aws-launch-continue")?.addEventListener("click", handleAwsLaunchContinue);
 
 // GitHub
+document.getElementById("btn-github-has-account")?.addEventListener("click", () => showPhase("github", 3));
+document.getElementById("btn-github-needs-account")?.addEventListener("click", () => showPhase("github", 2));
+document.getElementById("btn-github-signup-done")?.addEventListener("click", () => showPhase("github", 3));
 document.getElementById("btn-github-save")?.addEventListener("click", () => {
   const username = document.getElementById("github-username")?.value?.trim();
-  handleGithub(username || null);
+  if (!username) {
+    const input = document.getElementById("github-username");
+    input?.classList.add("input-error");
+    setTimeout(() => input?.classList.remove("input-error"), 1000);
+    return;
+  }
+  handleGithub(username);
 });
-document.getElementById("btn-github-skip")?.addEventListener("click", () => handleGithub(null));
+document.getElementById("btn-github-skip")?.addEventListener("click", (e) => { e.preventDefault(); handleGithub(null); });
 
 // Phase navigation (all credential screens)
 document.querySelectorAll(".phase-next").forEach((btn) => {
