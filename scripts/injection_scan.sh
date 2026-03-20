@@ -64,6 +64,10 @@ redact_sensitive() {
 
 send_telegram() {
   local msg="$1"
+  if [ "${INJECTION_SCAN_NO_TELEGRAM:-0}" = "1" ]; then
+    echo "[info] INJECTION_SCAN_NO_TELEGRAM=1; skipping outbound telegram message"
+    return 0
+  fi
   if [ -z "${TELEGRAM_TOKEN}" ] || [ "${TELEGRAM_TOKEN}" = "YOUR_DEFAULT_BOT_TOKEN" ]; then
     echo "[warn] TELEGRAM_TOKEN not configured; skipping outbound telegram message"
     return 0
@@ -77,15 +81,87 @@ send_telegram() {
   for cid in "${CHAT_IDS[@]}"; do
     [ -n "${cid}" ] || continue
     [ "${cid}" = "YOUR_CHAT_ID" ] && continue
-    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+    curl -s --max-time 8 -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
       -d chat_id="${cid}" \
       -d text="${msg}" \
       -d parse_mode="Markdown" > /dev/null 2>&1 || \
     # Fallback without markdown if formatting breaks the message
-    curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+    curl -s --max-time 8 -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
       -d chat_id="${cid}" \
       -d text="${msg}" > /dev/null 2>&1
   done
+}
+
+collect_prompt_files() {
+  local dir="$1"
+  find "$dir" \
+    \( -type d \( \
+      -name ".git" -o \
+      -name "node_modules" -o \
+      -name "dist" -o \
+      -name "build" -o \
+      -name ".venv" -o \
+      -name "__pycache__" -o \
+      -name ".mypy_cache" -o \
+      -name ".pytest_cache" \
+    \) -prune \) -o \
+    \( -type f \( \
+      -name "AGENTS.md" -o \
+      -name "SOUL.md" -o \
+      -name "USER.md" -o \
+      -name "MEMORY.md" -o \
+      -name "HEARTBEAT.md" -o \
+      -name "TOOLS.md" -o \
+      -name "SKILL.md" -o \
+      -path "*/memory/*.md" \
+    \) -print \)
+}
+
+collect_trusted_context_md_files() {
+  local dir="$1"
+  find "$dir" \
+    \( -type d \( \
+      -name ".git" -o \
+      -name "node_modules" -o \
+      -name "dist" -o \
+      -name "build" -o \
+      -name ".venv" -o \
+      -name "__pycache__" -o \
+      -name ".mypy_cache" -o \
+      -name ".pytest_cache" \
+    \) -prune \) -o \
+    \( -type f \( \
+      -name "AGENTS.md" -o \
+      -name "SOUL.md" -o \
+      -name "USER.md" -o \
+      -name "MEMORY.md" -o \
+      -name "HEARTBEAT.md" -o \
+      -name "TOOLS.md" -o \
+      -path "*/memory/*.md" \
+    \) -print \)
+}
+
+collect_url_scan_files() {
+  local dir="$1"
+  find "$dir" \
+    \( -type d \( \
+      -name ".git" -o \
+      -name "node_modules" -o \
+      -name "dist" -o \
+      -name "build" -o \
+      -name ".venv" -o \
+      -name "__pycache__" -o \
+      -name ".mypy_cache" -o \
+      -name ".pytest_cache" \
+    \) -prune \) -o \
+    \( -type f \( \
+      -name "AGENTS.md" -o \
+      -name "SOUL.md" -o \
+      -name "USER.md" -o \
+      -name "MEMORY.md" -o \
+      -name "HEARTBEAT.md" -o \
+      -name "TOOLS.md" \
+    \) -print \)
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -105,7 +181,8 @@ KEYWORDS=(
   "roleplay as"
   "bypass safety"
   "ignore all previous"
-  "system prompt"
+  "reveal.*system prompt"
+  "show.*system prompt"
   "reveal your instructions"
   "act as if"
   "do not follow"
@@ -114,12 +191,14 @@ KEYWORDS=(
 
 for dir in "${AGENT_DIRS[@]}"; do
   [ -d "$dir" ] || continue
+  mapfile -t prompt_files < <(collect_prompt_files "$dir")
+  [ "${#prompt_files[@]}" -gt 0 ] || continue
   for kw in "${KEYWORDS[@]}"; do
     while IFS=: read -r file lineno content; do
       # Skip this scan script itself
       [[ "$file" == *"injection_scan"* ]] && continue
       flag "$file" "$lineno" "Injection keyword: '${kw}'" "$content"
-    done < <(grep -rni "${kw}" "${dir}" 2>/dev/null || true)
+    done < <(grep -ni "${kw}" "${prompt_files[@]}" 2>/dev/null || true)
   done
 done
 
@@ -131,10 +210,12 @@ done
 # hyphen, U+2060-2064 invisible operators
 for dir in "${AGENT_DIRS[@]}"; do
   [ -d "$dir" ] || continue
+  mapfile -t prompt_files < <(collect_prompt_files "$dir")
+  [ "${#prompt_files[@]}" -gt 0 ] || continue
   while IFS=: read -r file lineno content; do
     [[ "$file" == *"injection_scan"* ]] && continue
     flag "$file" "$lineno" "Hidden unicode / zero-width character" "$content"
-  done < <(grep -rnP '[\x{200B}\x{200C}\x{200D}\x{200E}\x{200F}\x{FEFF}\x{00AD}\x{2060}\x{2061}\x{2062}\x{2063}\x{2064}]' "${dir}" 2>/dev/null || true)
+  done < <(grep -nP '[\x{200B}\x{200C}\x{200D}\x{200E}\x{200F}\x{FEFF}\x{00AD}\x{2060}\x{2061}\x{2062}\x{2063}\x{2064}]' "${prompt_files[@]}" 2>/dev/null || true)
 done
 
 # ═══════════════════════════════════════════════════════════════════
@@ -142,22 +223,26 @@ done
 # ═══════════════════════════════════════════════════════════════════
 for dir in "${AGENT_DIRS[@]}"; do
   [ -d "$dir" ] || continue
+  mapfile -t prompt_files < <(collect_prompt_files "$dir")
+  [ "${#prompt_files[@]}" -gt 0 ] || continue
   while IFS=: read -r file lineno content; do
     [[ "$file" == *"injection_scan"* ]] && continue
     basename_file=$(basename "$file")
     if [ "$basename_file" != "TOOLS.md" ]; then
       flag "$file" "$lineno" "Possible JWT token" "$content"
     fi
-  done < <(grep -rnP 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}' "${dir}" 2>/dev/null || true)
+  done < <(grep -nP 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}' "${prompt_files[@]}" 2>/dev/null || true)
 done
 
 # ═══════════════════════════════════════════════════════════════════
 # SCAN 4: URLs not on the allowlist
 # ═══════════════════════════════════════════════════════════════════
-ALLOWED='(192\.168\.[0-9]+\.[0-9]+|localhost|127\.0\.0\.1|openclaw\.ai|github\.com|clawhub\.com|wpilib\.org|revrobotics\.com|ctr-electronics\.com|pathplanner\.dev|first\.org|firstinspires\.org|thebluealliance\.com|statbotics\.io|frc-events\.firstinspires\.org)'
+ALLOWED='(192\.168\.[0-9]+\.[0-9]+|localhost|127\.0\.0\.1|openclaw\.ai|github\.com|clawhub\.com|wpilib\.org|revrobotics\.com|ctr-electronics\.com|pathplanner\.dev|first\.org|firstinspires\.org|thebluealliance\.com|statbotics\.io|frc-events\.firstinspires\.org|example\.com|cgc\.umn\.edu)'
 
 for dir in "${AGENT_DIRS[@]}"; do
   [ -d "$dir" ] || continue
+  mapfile -t context_files < <(collect_url_scan_files "$dir")
+  [ "${#context_files[@]}" -gt 0 ] || continue
   while IFS=: read -r file lineno content; do
     [[ "$file" == *"injection_scan"* ]] && continue
     # Extract each URL from the line
@@ -167,7 +252,7 @@ for dir in "${AGENT_DIRS[@]}"; do
         flag "$file" "$lineno" "URL not on allowlist" "$url"
       fi
     done
-  done < <(grep -rnP 'https?://' "${dir}" 2>/dev/null || true)
+  done < <(grep -nP 'https?://' "${context_files[@]}" 2>/dev/null || true)
 done
 
 # ═══════════════════════════════════════════════════════════════════
@@ -196,7 +281,7 @@ for dir in "${AGENT_DIRS[@]}"; do
       mod_time=$(stat -c '%y' "$md_file" 2>/dev/null || stat -f '%Sm' "$md_file" 2>/dev/null || echo "unknown")
       flag "$md_file" "N/A" "Unexpected .md modified (agent: ${agent_name})" "Last modified: ${mod_time}"
     fi
-  done < <(find "${dir}" -name "*.md" -mtime -1 2>/dev/null || true)
+  done < <(collect_trusted_context_md_files "${dir}" | xargs -r -I{} find "{}" -mtime -1 2>/dev/null || true)
 done
 
 # ═══════════════════════════════════════════════════════════════════
