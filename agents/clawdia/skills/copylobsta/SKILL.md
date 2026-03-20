@@ -8,11 +8,14 @@ user-invocable: true
 
 ## When the user invokes /copylobsta (Telegram group or DM)
 
-Use `web_fetch` to POST to the local CopyLobsta server `/api/launch` endpoint:
-- URL: `http://127.0.0.1:${COPYLOBSTA_PORT:-3457}/api/launch`
-- Header: `Content-Type: application/json`
-- Header: `x-launch-secret: ${COPYLOBSTA_LAUNCH_SECRET}`
-- Body: `{"chat_id":"<the chat id>"}`
+Use bash to POST to the local CopyLobsta server `/api/launch` endpoint:
+
+```bash
+curl -s -X POST "http://127.0.0.1:${COPYLOBSTA_PORT:-3457}/api/launch" \
+  -H "Content-Type: application/json" \
+  -H "x-launch-secret: ${COPYLOBSTA_LAUNCH_SECRET}" \
+  -d '{"chat_id":"<the chat id>"}'
+```
 
 The server will:
 1. Verify sharing mode and launch secret

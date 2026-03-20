@@ -8,17 +8,21 @@ user-invocable: true
 
 ## When the user asks for trivia or voice trivia (Telegram)
 
-Use `web_fetch` to POST to the Trivia Voice server's `/api/launch` endpoint. The base URL is set via the `TRIVIA_VOICE_BASE_URL` environment variable. POST to `${TRIVIA_VOICE_BASE_URL}/api/launch` with:
-- Header: `Content-Type: application/json`
-- Header: `Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}`
-- Body: `{}`
+Use bash to POST to the Trivia Voice server's `/api/launch` endpoint:
+
+```bash
+curl -s -X POST "http://127.0.0.1:3456/api/launch" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}" \
+  -d '{}'
+```
 
 This sends a "Start Voice Trivia" button to the user's Telegram chat. The server knows which chat to send to.
 
 After calling, reply:
 "I just sent you a trivia button — tap 'Start Voice Trivia' to launch the voice game!"
 
-If the web_fetch fails, fall back to text trivia below.
+If the curl call fails (non-zero exit or error response), fall back to text trivia below.
 
 ## Text-only fallback (non-Telegram or if voice is unavailable)
 
