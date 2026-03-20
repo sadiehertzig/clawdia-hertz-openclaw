@@ -19,8 +19,8 @@ router.post("/api/session", (req, res) => {
         // Check for stale sessions (14 days inactive) — mark as abandoned
         if (sessionStore.isStale(session) && !["COMPLETE", "ABANDONED", "FAILED"].includes(session.state)) {
             sessionStore.update(user.id, { state: "ABANDONED" });
-            // Start fresh
-            session = sessionStore.getOrCreate(user.id, user.username || null);
+            // Start fresh with a new welcome session.
+            session = sessionStore.reset(user.id, user.username || null);
         }
         // Bind referral context from deep-link start param (first load only)
         const { startParam } = req.body || {};

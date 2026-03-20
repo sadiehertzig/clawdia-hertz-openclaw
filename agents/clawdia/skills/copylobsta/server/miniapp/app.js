@@ -335,7 +335,7 @@ async function checkForInstanceDetails() {
   try {
     const data = await apiCall("GET", "/api/aws/poll-callback");
     if (data.ready) {
-      setupToken = data.setupToken;
+      setupToken = "ready";
     }
   } catch {
     // Not ready yet
@@ -373,7 +373,7 @@ async function handleAwsSignupDone() {
 async function handleCfnLaunch() {
   try {
     const data = await apiCall("GET", "/api/aws/quick-create-url");
-    setupToken = data.setupToken;
+    setupToken = "pending";
     window.open(data.url, "_blank");
     document.getElementById("aws-launch-info").classList.add("hidden");
     document.getElementById("aws-launch-waiting").classList.remove("hidden");
@@ -391,7 +391,7 @@ function startCallbackPolling() {
       if (data.ready) {
         clearInterval(pollTimer);
         pollTimer = null;
-        setupToken = data.setupToken;
+        setupToken = "ready";
         currentSession.state = data.state;
         document.getElementById("aws-launch-waiting").classList.add("hidden");
         document.getElementById("aws-launch-done").classList.remove("hidden");
@@ -564,7 +564,10 @@ async function triggerDeploy() {
     if (spinner) spinner.style.display = "none";
     const stepsEl = document.getElementById("deploy-steps");
     if (stepsEl) {
-      stepsEl.innerHTML += `<li class="step-failed">${err.message || "Deployment failed"}</li>`;
+      const failureStep = document.createElement("li");
+      failureStep.className = "step-failed";
+      failureStep.textContent = err.message || "Deployment failed";
+      stepsEl.appendChild(failureStep);
     }
     const retryBtn = document.createElement("button");
     retryBtn.className = "btn-primary";

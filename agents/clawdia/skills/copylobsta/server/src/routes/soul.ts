@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BOT_TOKEN, SETUP_API_PORT } from "../config.js";
+import { BOT_TOKEN } from "../config.js";
 import { requireTelegramUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition, getStepNumber, TOTAL_STEPS } from "../lib/stateMachine.js";
@@ -127,12 +127,12 @@ router.post("/api/soul/deploy", async (req, res) => {
       return;
     }
 
-    if (!session.aws.instanceIp || !session.setupToken) {
+    if (!session.aws.setupBaseUrl || !session.setupToken) {
       res.status(400).json({ error: "instance not ready" });
       return;
     }
 
-    const setupUrl = `http://${session.aws.instanceIp}:${SETUP_API_PORT}`;
+    const setupUrl = session.aws.setupBaseUrl;
 
     // Send SOUL.md to the instance
     const deployRes = await fetch(`${setupUrl}/setup/deploy`, {
@@ -142,7 +142,6 @@ router.post("/api/soul/deploy", async (req, res) => {
         "x-session-token": session.setupToken,
       },
       body: JSON.stringify({
-        sessionToken: session.setupToken,
         soulMarkdown: session.soul.draftMarkdown,
         userMarkdown: session.user.draftMarkdown,
         githubUsername: session.credentials.githubUsername,
@@ -212,12 +211,12 @@ router.get("/api/deploy/status", async (req, res) => {
       return;
     }
 
-    if (!session.aws.instanceIp || !session.setupToken) {
+    if (!session.aws.setupBaseUrl || !session.setupToken) {
       res.status(400).json({ error: "instance not ready" });
       return;
     }
 
-    const setupUrl = `http://${session.aws.instanceIp}:${SETUP_API_PORT}`;
+    const setupUrl = session.aws.setupBaseUrl;
     const statusRes = await fetch(`${setupUrl}/setup/deploy-status`, {
       headers: { "x-session-token": session.setupToken },
     });

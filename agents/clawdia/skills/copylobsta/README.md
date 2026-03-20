@@ -44,10 +44,10 @@ Install `copylobsta.service` to run as a background service.
 ## Testing
 
 ```bash
-# Server tests (55 tests)
+# Server tests
 cd server && npm test
 
-# Setup API tests (18 tests)
+# Setup API tests
 cd setup-api && npm test
 ```
 

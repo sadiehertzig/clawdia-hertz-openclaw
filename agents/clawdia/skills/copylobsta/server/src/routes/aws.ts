@@ -72,7 +72,7 @@ router.get("/api/aws/quick-create-url", (req, res) => {
       callbackUrl: `${callbackBase}/api/aws/instance-callback`,
     });
 
-    res.json({ url, setupToken: token });
+    res.json({ url });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     res.status(400).json({ error: message });
@@ -150,7 +150,6 @@ router.get("/api/aws/poll-callback", (req, res) => {
       instanceIp: session.aws.instanceIp,
       instanceId: session.aws.instanceId,
       setupBaseUrl: session.aws.setupBaseUrl,
-      setupToken: session.setupToken,
       state: session.state,
     });
   } catch (err: unknown) {
@@ -192,7 +191,7 @@ router.post("/api/aws/proxy-validate", async (req, res) => {
         "Content-Type": "application/json",
         "x-session-token": session.setupToken,
       },
-      body: JSON.stringify({ provider, key, sessionToken: session.setupToken }),
+      body: JSON.stringify({ provider, key }),
     });
 
     const data = await upstream.json();

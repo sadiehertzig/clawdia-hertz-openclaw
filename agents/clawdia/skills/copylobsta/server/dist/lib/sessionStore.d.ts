@@ -1,6 +1,8 @@
 import type { Session } from "../types.js";
 /** Get an existing session or create a new one for this user. */
 export declare function getOrCreate(userId: number, username?: string | null): Session;
+/** Reset a user's session file to a fresh WELCOME session. */
+export declare function reset(userId: number, username?: string | null): Session;
 /** Get a session by user ID. Returns null if not found. */
 export declare function get(userId: number): Session | null;
 /** Find a session by its setup token (for instance callback auth). */

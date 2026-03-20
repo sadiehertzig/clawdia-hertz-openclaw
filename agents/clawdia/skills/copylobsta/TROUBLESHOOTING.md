@@ -32,11 +32,11 @@ The setup API on your instance may still be starting.
 4. Verify the instance has an IAM role with SSM permissions (check instance details)
 
 ### "Could not reach your server" during key validation
-1. The setup API runs on port 8080 — check that Security Group allows inbound 8080
+1. The setup API binds to `127.0.0.1:8080` and is reached through a temporary HTTPS tunnel. You should not need to open inbound 8080 in Security Group.
 2. Try refreshing the Mini App
 3. If the instance was restarted, the setup API may need to be restarted:
    - In AWS Console → Systems Manager → Run Command
-   - Run: `cd /home/ubuntu/copylobsta && node setup-api/dist/index.js`
+   - Run: `cd ~/copylobsta/agents/main/skills/copylobsta/setup-api && node dist/index.js`
 
 ## API Key Issues
 

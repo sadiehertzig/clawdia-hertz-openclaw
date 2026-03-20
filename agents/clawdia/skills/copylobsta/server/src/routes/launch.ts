@@ -64,7 +64,7 @@ router.post("/api/launch", async (req, res) => {
 
     // Cleanup old entries (older than 2 hours)
     for (const [key, val] of referralStore) {
-      if (Date.now() - new Date(val.expiresAt).getTime() > 3600_000) {
+      if (Date.now() - new Date(val.expiresAt).getTime() > 7_200_000) {
         referralStore.delete(key);
       }
     }

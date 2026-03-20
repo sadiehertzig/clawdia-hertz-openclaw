@@ -145,6 +145,15 @@ export function getOrCreate(userId: number, username: string | null = null): Ses
   });
 }
 
+/** Reset a user's session file to a fresh WELCOME session. */
+export function reset(userId: number, username: string | null = null): Session {
+  return withLock(String(userId), () => {
+    const session = createDefaultSession(userId, username);
+    writeFileSync(sessionPath(String(userId)), JSON.stringify(session, null, 2));
+    return session;
+  });
+}
+
 /** Get a session by user ID. Returns null if not found. */
 export function get(userId: number): Session | null {
   const path = sessionPath(String(userId));

@@ -9,7 +9,9 @@
  */
 import express from "express";
 import cors from "cors";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { validateKey } from "./keyValidator.js";
 import { writeSecret } from "./secretsWriter.js";
 const PORT = parseInt(process.env.SETUP_API_PORT || "8080", 10);
@@ -101,21 +103,26 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
     ];
     const deployAsync = async () => {
         const { writeFile } = await import("node:fs/promises");
-        const { resolve } = await import("node:path");
         const homeDir = process.env.HOME || "/home/openclaw";
-        const repoDir = process.env.COPYLOBSTA_REPO_DIR || resolve(homeDir, "copylobsta");
+        const repoDir = resolve(process.env.COPYLOBSTA_REPO_DIR || resolve(homeDir, "copylobsta"));
+        const homeRepoDir = resolve(homeDir, "copylobsta");
         // Step 1: Verify repo exists (no git pull from moving HEAD)
         await runDeployStep("clone_repo", async () => {
-            try {
-                execSync(`test -d ${repoDir}`, { timeout: 5_000, stdio: "pipe" });
-            }
-            catch {
+            if (!existsSync(repoDir)) {
                 throw new Error(`CopyLobsta repo not found at ${repoDir}`);
+            }
+            // Restrict deploy writes to expected install paths.
+            if (repoDir !== homeRepoDir && !repoDir.startsWith(`${homeRepoDir}/`)) {
+                throw new Error(`COPYLOBSTA_REPO_DIR must be inside ${homeRepoDir}`);
             }
         });
         // Step 2: Install dependencies
         await runDeployStep("install_deps", async () => {
-            execSync(`cd ${repoDir} && bash setup/install.sh`, { timeout: 180_000, stdio: "pipe" });
+            execFileSync("bash", ["setup/install.sh"], {
+                cwd: repoDir,
+                timeout: 180_000,
+                stdio: "pipe",
+            });
         });
         // Step 3: Write SOUL.md
         await runDeployStep("write_soul", async () => {
@@ -132,7 +139,9 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         });
         await runDeployStep("start_pm2", async () => {
             try {
-                execSync("systemctl --user restart openclaw-gateway 2>&1 || pm2 restart openclaw-gateway 2>&1 || true", { timeout: 30_000, stdio: "pipe" });
+                execFileSync("bash", ["-lc",
+                    "systemctl --user restart openclaw-gateway 2>&1 || pm2 restart openclaw-gateway 2>&1 || true",
+                ], { timeout: 30_000, stdio: "pipe" });
             }
             catch {
                 // Best effort
@@ -141,7 +150,9 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         await runDeployStep("health_check", async () => {
             await new Promise((r) => setTimeout(r, 3000));
             try {
-                execSync("curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health || true", { timeout: 10_000, stdio: "pipe" });
+                execFileSync("bash", ["-lc",
+                    "curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health || true",
+                ], { timeout: 10_000, stdio: "pipe" });
             }
             catch {
                 // Best effort
@@ -149,7 +160,9 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         });
         await runDeployStep("auto_restart", async () => {
             try {
-                execSync("pm2 save 2>&1 || systemctl --user enable openclaw-gateway 2>&1 || true", { timeout: 10_000, stdio: "pipe" });
+                execFileSync("bash", ["-lc",
+                    "pm2 save 2>&1 || systemctl --user enable openclaw-gateway 2>&1 || true",
+                ], { timeout: 10_000, stdio: "pipe" });
             }
             catch {
                 // Best effort
@@ -171,7 +184,7 @@ app.post("/setup/complete", requireToken, (_req, res) => {
     console.log("Setup complete. Shutting down in 5 seconds...");
     // Stop temporary setup tunnel if it exists.
     try {
-        execSync("pkill -f 'cloudflared tunnel --url http://localhost:8080' || true", { stdio: "pipe" });
+        execFileSync("pkill", ["-f", "cloudflared tunnel --url http://localhost:8080"], { stdio: "pipe" });
     }
     catch {
         // Best effort

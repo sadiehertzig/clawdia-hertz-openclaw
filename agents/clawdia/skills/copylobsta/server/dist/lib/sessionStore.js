@@ -141,6 +141,14 @@ export function getOrCreate(userId, username = null) {
         return session;
     });
 }
+/** Reset a user's session file to a fresh WELCOME session. */
+export function reset(userId, username = null) {
+    return withLock(String(userId), () => {
+        const session = createDefaultSession(userId, username);
+        writeFileSync(sessionPath(String(userId)), JSON.stringify(session, null, 2));
+        return session;
+    });
+}
 /** Get a session by user ID. Returns null if not found. */
 export function get(userId) {
     const path = sessionPath(String(userId));
