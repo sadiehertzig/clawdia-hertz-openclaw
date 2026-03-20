@@ -1,6 +1,6 @@
 ---
 name: patternscout
-description: Hybrid retrieval front door for FRC patterns: local team sources, curated docs, official examples, then remote fallback.
+description: "Hybrid retrieval front door for FRC patterns: local team sources, curated docs, official examples, then remote fallback."
 user-invocable: true
 metadata: {"openclaw":{"requires":{"bins":["rg","gh"]}}}
 ---

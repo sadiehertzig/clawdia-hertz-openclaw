@@ -100,7 +100,7 @@ deep-research/
 ├── README.md      # This file
 ├── quickref.md    # One-page cheat sheet
 ├── example.md     # Complete workflow example
-└── LICENSE        # Apache 2.0
+└── LICENSE.txt    # Apache 2.0
 ```
 
 ## When to Use This
@@ -113,7 +113,7 @@ deep-research/
 
 ## License
 
-Apache 2.0 — See [LICENSE](LICENSE)
+Apache 2.0 — See [LICENSE.txt](LICENSE.txt)
 
 ---
 
