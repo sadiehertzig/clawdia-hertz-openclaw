@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 %h/copylobsta/agents/main/skills/api-spend-tracker/scripts/log_server.py
+ExecStart=/usr/bin/python3 %h/clawdia-hertz-openclaw/agents/clawdia/skills/api-spend-tracker/scripts/log_server.py
 EnvironmentFile=%h/.openclaw/.env
 Restart=on-failure
 RestartSec=5

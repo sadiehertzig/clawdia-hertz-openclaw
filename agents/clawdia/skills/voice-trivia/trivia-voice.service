@@ -9,6 +9,7 @@ ExecStart=/usr/bin/node index.js
 Restart=always
 RestartSec=5
 EnvironmentFile=%h/.openclaw/.env
+ExecStartPre=/usr/bin/bash -lc 'f="$HOME/.openclaw/.env"; [ -r "$f" ] || { echo "[trivia-preflight] missing or unreadable $f"; exit 1; }; mode=$(stat -c "%%a" "$f" 2>/dev/null || true); case "$mode" in 600|400) ;; "") ;; *) echo "[trivia-preflight] warning: $f permissions are $mode (recommended 600)";; esac; tok=$(grep -E "^OPENCLAW_GATEWAY_TOKEN=" "$f" | tail -n 1 | cut -d= -f2-); [ -n "$tok" ] || { echo "[trivia-preflight] OPENCLAW_GATEWAY_TOKEN missing in $f"; exit 1; }; bot=$(grep -E "^OPENCLAW_TELEGRAM_BOT_TOKEN=" "$f" | tail -n 1 | cut -d= -f2-); [ -n "$bot" ] || { echo "[trivia-preflight] OPENCLAW_TELEGRAM_BOT_TOKEN missing in $f"; exit 1; }; base=$(grep -E "^APP_BASE_URL=" "$f" | tail -n 1 | cut -d= -f2-); [ -n "$base" ] || { echo "[trivia-preflight] APP_BASE_URL missing in $f"; exit 1; }'
 
 [Install]
 WantedBy=default.target

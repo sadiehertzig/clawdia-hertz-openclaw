@@ -36,6 +36,9 @@ node_modules/
 agents/clawdia/skills/autoimprove-tbc/targets/
 agents/clawdia/skills/autoimprove-tbc/_tg_offset
 
+# self-improving-agent learnings
+.learnings/
+
 # agent mirrors
 mirrors/
 tmp/

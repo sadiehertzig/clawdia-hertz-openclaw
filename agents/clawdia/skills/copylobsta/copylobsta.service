@@ -4,12 +4,12 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/copylobsta/agents/main/skills/copylobsta/server
-# Edit WorkingDirectory if your repo is not at ~/copylobsta
+WorkingDirectory=%h/clawdia-hertz-openclaw/agents/clawdia/skills/copylobsta/server
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=5
 EnvironmentFile=%h/.openclaw/.env
+ExecStartPre=/usr/bin/bash -lc 'f="$HOME/.openclaw/.env"; [ -r "$f" ] || { echo "[copylobsta-preflight] missing or unreadable $f"; exit 1; }; mode=$(stat -c "%%a" "$f" 2>/dev/null || true); case "$mode" in 600|400) ;; "") ;; *) echo "[copylobsta-preflight] warning: $f permissions are $mode (recommended 600)";; esac; bot=$(grep -E "^OPENCLAW_TELEGRAM_BOT_TOKEN=" "$f" | tail -n 1 | cut -d= -f2-); [ -n "$bot" ] || { echo "[copylobsta-preflight] OPENCLAW_TELEGRAM_BOT_TOKEN missing in $f"; exit 1; }; modev=$(grep -E "^COPYLOBSTA_SHARING_MODE=" "$f" | tail -n 1 | cut -d= -f2-); if [ "$modev" = "on_demand" ]; then sec=$(grep -E "^COPYLOBSTA_LAUNCH_SECRET=" "$f" | tail -n 1 | cut -d= -f2-); [ -n "$sec" ] || { echo "[copylobsta-preflight] COPYLOBSTA_LAUNCH_SECRET missing while COPYLOBSTA_SHARING_MODE=on_demand"; exit 1; }; fi'
 
 [Install]
 WantedBy=default.target
