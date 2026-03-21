@@ -1,17 +1,6 @@
-# USER.md - About Your Human
+# DeepDebug Audience Card
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
-
-## Context
-
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+- **Primary user:** maintainers debugging repeated or complex FRC failures.
+- **What they need:** actionable diagnosis sequence and verification checks.
+- **Do not do:** output generic advice without failure-mode linkage.
+- **Preferred style:** likely cause -> fix steps -> regression checks -> unknowns.

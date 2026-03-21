@@ -101,6 +101,43 @@ function qualityScore(dossier) {
   return null;
 }
 
+function countDelegationStages(dossier) {
+  const byStage = dossier?.worker_backend_by_stage && typeof dossier.worker_backend_by_stage === 'object'
+    ? dossier.worker_backend_by_stage
+    : {};
+  const fallbackByStage = dossier?.fallback_reason_by_stage && typeof dossier.fallback_reason_by_stage === 'object'
+    ? dossier.fallback_reason_by_stage
+    : {};
+
+  let total = 0;
+  let spawned = 0;
+  let fallback = 0;
+
+  for (const [stage, backendRaw] of Object.entries(byStage)) {
+    if (stage === 'coach_evaluator') continue;
+    const backend = String(backendRaw || '').toLowerCase();
+    if (backend === 'none' || !backend) continue;
+    total += 1;
+    if (backend === 'spawned') spawned += 1;
+    if (fallbackByStage[stage]) fallback += 1;
+  }
+
+  return { total, spawned, fallback };
+}
+
+function hasReviewIntegrityViolation(dossier) {
+  const reviewedMode = String(dossier?.answer_mode || '').toLowerCase() === 'reviewed_answer';
+  const reviewCompleted = dossier?.review_state?.review_completed === true;
+  if (reviewedMode && !reviewCompleted) return true;
+
+  const arbiterOutput = dossier?.worker_outputs?.arbiter;
+  if (arbiterOutput && arbiterOutput.status === 'error' && arbiterOutput?.contract_flags?.reviewed === true) {
+    return true;
+  }
+
+  return false;
+}
+
 function collectFailureReasons(dossier) {
   const reasons = [];
   const outcome = normalizedOutcomeLabel(dossier);
@@ -198,6 +235,10 @@ function renderDigestMarkdown(summary) {
   lines.push(`- total_requests: ${summary.totalRequests}`);
   lines.push(`- failure_requests: ${summary.failureCount}`);
   lines.push(`- average_quality_score: ${summary.averageQualityScore == null ? 'n/a' : summary.averageQualityScore}`);
+  lines.push(`- delegation_usage_percent: ${summary.delegationUsagePercent}`);
+  lines.push(`- fallback_percent: ${summary.fallbackPercent}`);
+  lines.push(`- guarded_percent: ${summary.guardedPercent}`);
+  lines.push(`- review_integrity_violations: ${summary.reviewIntegrityViolations}`);
   lines.push('');
 
   lines.push('## Intent Counts');
@@ -312,6 +353,11 @@ function generateNightlyDigest(options) {
   const outcomeCounts = {};
   const failureReasonCounts = {};
   const dossiers = [];
+  let delegationStageTotal = 0;
+  let delegationStageSpawned = 0;
+  let delegationStageFallback = 0;
+  let guardedCount = 0;
+  let reviewIntegrityViolations = 0;
 
   for (const requestPath of listRequestJsonFiles(runtimeRoot)) {
     const dossier = readJson(requestPath);
@@ -323,6 +369,19 @@ function generateNightlyDigest(options) {
     inc(intentCounts, String(dossier.intent || 'unknown'));
     inc(answerModeCounts, String(dossier.answer_mode || 'unknown'));
     inc(outcomeCounts, normalizedOutcomeLabel(dossier));
+
+    const delegation = countDelegationStages(dossier);
+    delegationStageTotal += delegation.total;
+    delegationStageSpawned += delegation.spawned;
+    delegationStageFallback += delegation.fallback;
+
+    if (dossier?.review_state?.guarded === true || String(dossier?.answer_mode || '').toLowerCase() === 'guarded_answer') {
+      guardedCount += 1;
+    }
+
+    if (hasReviewIntegrityViolation(dossier)) {
+      reviewIntegrityViolations += 1;
+    }
   }
 
   const failures = dossiers
@@ -398,6 +457,16 @@ function generateNightlyDigest(options) {
     totalRequests: dossiers.length,
     failureCount: failures.length,
     averageQualityScore,
+    delegationUsagePercent: delegationStageTotal > 0
+      ? Math.round((delegationStageSpawned / delegationStageTotal) * 1000) / 10
+      : 0,
+    fallbackPercent: delegationStageTotal > 0
+      ? Math.round((delegationStageFallback / delegationStageTotal) * 1000) / 10
+      : 0,
+    guardedPercent: dossiers.length > 0
+      ? Math.round((guardedCount / dossiers.length) * 1000) / 10
+      : 0,
+    reviewIntegrityViolations,
     intentCounts,
     answerModeCounts,
     outcomeCounts,
@@ -429,7 +498,11 @@ if (require.main === module) {
     regressionTasksWritten: out.summary.regressionTasksWritten,
     patternscoutLearning: out.summary.patternscoutLearning,
     totalRequests: out.summary.totalRequests,
-    failureCount: out.summary.failureCount
+    failureCount: out.summary.failureCount,
+    delegationUsagePercent: out.summary.delegationUsagePercent,
+    fallbackPercent: out.summary.fallbackPercent,
+    guardedPercent: out.summary.guardedPercent,
+    reviewIntegrityViolations: out.summary.reviewIntegrityViolations
   }, null, 2) + '\n');
 }
 

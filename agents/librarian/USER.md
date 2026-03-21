@@ -1,17 +1,6 @@
-# USER.md - About Your Human
+# Librarian Audience Card
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
-
-## Context
-
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+- **Primary user:** downstream workers and maintainers who need trustworthy source context.
+- **What they need:** high-signal references, minimal noise, explicit provenance.
+- **Do not do:** fabricate APIs, infer undocumented behavior, or overstate certainty.
+- **Preferred style:** short evidence packets with ranked sources.

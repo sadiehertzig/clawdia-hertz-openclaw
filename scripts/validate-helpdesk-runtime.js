@@ -65,6 +65,34 @@ function workerHandlers() {
   };
 }
 
+function spawnedWorkerHandlers() {
+  return {
+    builder: () => ({
+      status: 'success',
+      summary: 'spawned builder draft',
+      spawn_session_id: 'spawn-builder-1',
+      student_facing_explanation: 'Spawned builder draft.',
+      code_blocks: [{ language: 'java', path: 'src/main/java/frc/robot/subsystems/SpawnedSubsystem.java', code: 'class SpawnedSubsystem {}' }]
+    }),
+    arbiter: () => ({
+      status: 'success',
+      summary: 'spawned arbiter approve',
+      spawn_session_id: 'spawn-arbiter-1',
+      verdict: 'approve',
+      concern_list: []
+    }),
+    deepdebug: () => ({
+      status: 'success',
+      summary: 'spawned deepdebug',
+      spawn_session_id: 'spawn-deepdebug-1',
+      diagnosis: 'spawned',
+      fix: 'spawned',
+      regression_checks: [],
+      unknowns: []
+    })
+  };
+}
+
 function assertFileExists(filePath) {
   assert.equal(fs.existsSync(filePath), true, `missing file: ${filePath}`);
 }
@@ -96,9 +124,119 @@ function run() {
   assert.equal(typeof substantive.dossier.self_improvement.quality_evaluation, 'object');
   assert.equal(typeof substantive.dossier.self_improvement.telemetry, 'object');
   assert.equal(substantive.dossier.self_improvement.telemetry.worker_count >= 1, true);
+  for (const stage of substantive.execution_plan) {
+    assert.equal(Object.prototype.hasOwnProperty.call(substantive.dossier.worker_backend_by_stage, stage), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(substantive.dossier.worker_session_id_by_stage, stage), true);
+    assert.equal(Object.prototype.hasOwnProperty.call(substantive.dossier.fallback_reason_by_stage, stage), true);
+  }
   assert.equal(String(substantive.final_message || '').includes('working...'), false);
   assert.equal(String(substantive.final_message || '').includes('Workers used:'), true);
-  console.log('ok - substantive flow includes evaluator + telemetry');
+  console.log('ok - substantive flow includes evaluator + invocation telemetry');
+
+  const lowEvidence = runtime.orchestrateRequest({
+    peerId: 'validate-peer-low-evidence',
+    route: 'helpdesk',
+    userMessage: 'Create a command draft for intake state machine'
+  }, {
+    runtimeRoot,
+    workerHandlers: {
+      ...workerHandlers(),
+      patternscout: () => ({
+        status: 'success',
+        summary: 'patternscout no evidence',
+        matches: [],
+        source_receipts: [],
+        source_tiers_used: [],
+        confidence: 'low'
+      }),
+      librarian: () => ({
+        status: 'success',
+        summary: 'librarian no evidence',
+        key_apis: [],
+        facts: [],
+        sources: []
+      })
+    }
+  });
+
+  assert.equal(lowEvidence.status_markers.includes('[low evidence]'), true);
+  assert.equal(String(lowEvidence.final_message || '').toLowerCase().includes('evidence is limited'), true);
+  console.log('ok - low evidence path adds guarded language');
+
+  const hybridSpawned = runtime.orchestrateRequest({
+    peerId: 'validate-peer-hybrid-spawn',
+    route: 'helpdesk',
+    userMessage: 'Generate a drivetrain subsystem draft with safety checks'
+  }, {
+    runtimeRoot,
+    workerInvocationMode: 'hybrid',
+    workerHandlers: workerHandlers(),
+    spawnWorkerHandlers: spawnedWorkerHandlers()
+  });
+
+  assert.equal(hybridSpawned.dossier.worker_backend_by_stage.builder, 'spawned');
+  assert.equal(hybridSpawned.dossier.worker_backend_by_stage.arbiter, 'spawned');
+  assert.equal(typeof hybridSpawned.dossier.worker_session_id_by_stage.builder, 'string');
+  assert.equal(hybridSpawned.answer_mode, 'reviewed_answer');
+  console.log('ok - hybrid substantive flow uses spawned builder/arbiter');
+
+  let localBuilderCalls = 0;
+  const hybridFallback = runtime.orchestrateRequest({
+    peerId: 'validate-peer-hybrid-fallback',
+    route: 'helpdesk',
+    userMessage: 'Write intake subsystem draft with command bindings'
+  }, {
+    runtimeRoot,
+    workerInvocationMode: 'hybrid',
+    workerHandlers: {
+      ...workerHandlers(),
+      builder: () => {
+        localBuilderCalls += 1;
+        return workerHandlers().builder();
+      }
+    },
+    spawnWorkerHandlers: {
+      ...spawnedWorkerHandlers(),
+      builder: () => ({
+        status: 'error',
+        summary: 'spawn timeout',
+        error: { message: 'spawn timeout' }
+      })
+    }
+  });
+
+  assert.equal(hybridFallback.dossier.worker_backend_by_stage.builder, 'local');
+  assert.equal(String(hybridFallback.dossier.fallback_reason_by_stage.builder || '').includes('timeout'), true);
+  assert.equal(localBuilderCalls >= 1, true);
+  console.log('ok - hybrid falls back to local with reason telemetry');
+
+  const spawnOnlyFailure = runtime.orchestrateRequest({
+    peerId: 'validate-peer-spawn-only',
+    route: 'helpdesk',
+    userMessage: 'Generate shooter subsystem with state machine behavior'
+  }, {
+    runtimeRoot,
+    workerInvocationMode: 'spawn_only',
+    workerHandlers: workerHandlers(),
+    spawnWorkerHandlers: {
+      ...spawnedWorkerHandlers(),
+      builder: () => ({
+        status: 'error',
+        summary: 'spawn unavailable',
+        error: { message: 'spawn unavailable' }
+      }),
+      arbiter: () => ({
+        status: 'error',
+        summary: 'spawn unavailable',
+        error: { message: 'spawn unavailable' }
+      })
+    }
+  });
+
+  assert.equal(spawnOnlyFailure.answer_mode, 'guarded_answer');
+  assert.equal(spawnOnlyFailure.dossier.worker_backend_by_stage.builder, 'spawned');
+  assert.equal(String(spawnOnlyFailure.dossier.fallback_reason_by_stage.builder || '').includes('spawn'), true);
+  console.log('ok - spawn_only failure guards without local fallback');
 
   const deepDebugIntent = runtime.quickClassify('please do a deep debug root cause analysis on this hard frc robot bug').intent;
   assert.equal(deepDebugIntent, 'deep_debug');
@@ -123,6 +261,7 @@ function run() {
 
   assert.equal(guardedWhenArbiterUnavailable.answer_mode, 'guarded_answer');
   assert.equal(guardedWhenArbiterUnavailable.dossier.review_state?.guarded, true);
+  assert.equal(guardedWhenArbiterUnavailable.dossier.review_state?.review_completed, false);
   console.log('ok - substantive flow is forced guarded when arbiter is unavailable');
 
   let deepDebugCalls = 0;
@@ -318,6 +457,10 @@ function run() {
   assert.equal(digest.summary.totalRequests >= 4, true);
   assert.equal(typeof digest.summary.failureCount, 'number');
   assert.equal(typeof digest.summary.patternscoutLearning, 'object');
+  assert.equal(typeof digest.summary.delegationUsagePercent, 'number');
+  assert.equal(typeof digest.summary.fallbackPercent, 'number');
+  assert.equal(typeof digest.summary.guardedPercent, 'number');
+  assert.equal(typeof digest.summary.reviewIntegrityViolations, 'number');
   assertFileExists(reportPath);
   assertFileExists(backlogPath);
   assert.equal(Array.isArray(digest.failureFiles), true);

@@ -13,3 +13,8 @@ Interpretation:
 - `reviewed_answer`: Arbiter completed review
 - `escalated_answer`: request escalated to DeepDebug
 - `guarded_answer`: a required review/escalation stage was unavailable or failed
+
+Integrity constraints:
+
+- `reviewed_answer` is only valid when Arbiter completed in the same request.
+- Substantive FRC requests must become `guarded_answer` if Arbiter is unavailable or errors.

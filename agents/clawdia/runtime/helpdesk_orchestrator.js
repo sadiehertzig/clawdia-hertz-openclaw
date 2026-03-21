@@ -3,6 +3,7 @@
 const dossier = require('./dossier_helpers');
 const classifier = require('./intent_classifier');
 const adapters = require('./worker_adapters');
+const invocationBackend = require('./worker_invocation_backend');
 const { patternScoutWorker } = require('./patternscout_worker');
 const { checkerWorker } = require('../../checker/checker_worker');
 const { librarianWorker } = require('../../librarian/librarian_worker');
@@ -20,7 +21,7 @@ const BASE_EXECUTION_PLANS = {
   vision_problem: ['patternscout', 'librarian', 'builder', 'checker', 'arbiter'],
   simulation_or_halsim: ['patternscout', 'librarian', 'builder', 'checker', 'arbiter'],
   explain_or_review: ['patternscout', 'librarian'],
-  deep_debug: ['patternscout', 'librarian', 'deepdebug'],
+  deep_debug: ['patternscout', 'librarian', 'arbiter'],
   follow_up: ['patternscout', 'librarian'],
   general_or_non_frc: []
 };
@@ -181,11 +182,9 @@ function planForIntent(intent, hints, parentDossier) {
 
   if (resolvedIntent === 'follow_up') {
     const parentIntent = parentDossier?.intent || parentDossier?.context?.parent_intent || null;
-    const reviewedOrEscalated = Boolean(
-      parentDossier?.review_state?.review_completed || parentDossier?.review_state?.escalation_completed
-    );
+    const reviewedParent = Boolean(parentDossier?.review_state?.review_completed);
 
-    if (hints.follow_up_failure && reviewedOrEscalated) {
+    if (hints.follow_up_failure && reviewedParent) {
       basePlan = ['patternscout', 'librarian', 'arbiter', 'deepdebug'];
     } else if (parentIntent && parentIntent !== 'follow_up' && BASE_EXECUTION_PLANS[parentIntent]) {
       basePlan = BASE_EXECUTION_PLANS[parentIntent].slice();
@@ -221,10 +220,11 @@ function formatAnswerBadge(answerMode) {
   }
 }
 
-function formatCheckerBadge(checkerOutput, executionPlan) {
+function formatCheckerBadge(checkerOutput, executionPlan, dossierObj) {
   const checkerPlanned = Array.isArray(executionPlan) && executionPlan.includes('checker');
   if (!checkerPlanned && !checkerOutput) return null;
   if (!checkerOutput || checkerOutput.status === 'error') return '[checks unavailable]';
+  if (dossierObj?.stage_status?.checker && dossierObj.stage_status.checker !== 'completed') return '[checks unavailable]';
 
   const overall = String(checkerOutput.overall_status || '').toLowerCase();
   if (overall === 'passed' || overall === 'pass') return '[checks passed]';
@@ -295,8 +295,19 @@ function composeFinalMessage(options) {
   } else if (opts.substantiveFlow && !d.review_state?.review_completed) {
     parts.push('No Arbiter review completed in this run.');
   }
+  if (opts.lowEvidence) {
+    parts.push('Evidence is limited in this run; treat implementation details as provisional and verify against docs and hardware before deployment.');
+  }
 
   return parts.join(' ').trim();
+}
+
+function hasRetrievalEvidence(dossierObj) {
+  const d = dossierObj || {};
+  if (Array.isArray(d.retrieval_sources) && d.retrieval_sources.length > 0) return true;
+  if (Array.isArray(d?.worker_outputs?.patternscout?.source_receipts) && d.worker_outputs.patternscout.source_receipts.length > 0) return true;
+  if (Array.isArray(d?.worker_outputs?.librarian?.sources) && d.worker_outputs.librarian.sources.length > 0) return true;
+  return false;
 }
 
 function runCoachEvaluator(reqDossier, runtimeCtx, meta) {
@@ -307,6 +318,11 @@ function runCoachEvaluator(reqDossier, runtimeCtx, meta) {
   dossier.noteStageStatus(reqDossier, worker, 'started');
 
   if (!isWorkerAvailable(worker, ctx)) {
+    dossier.noteWorkerInvocation(reqDossier, worker, {
+      backend: 'none',
+      sessionId: null,
+      fallbackReason: 'worker_unavailable'
+    });
     const skipped = adapters.adaptWorkerOutput(worker, {
       request_id: reqDossier.request_id,
       status: 'error',
@@ -319,6 +335,12 @@ function runCoachEvaluator(reqDossier, runtimeCtx, meta) {
     dossier.noteStageStatus(reqDossier, worker, 'skipped');
     return reqDossier;
   }
+
+  dossier.noteWorkerInvocation(reqDossier, worker, {
+    backend: 'local',
+    sessionId: null,
+    fallbackReason: null
+  });
 
   const startedAt = Date.now();
   let raw;
@@ -445,6 +467,8 @@ function orchestrateRequest(input, runtimeCtx) {
   const executionPlan = planForIntent(intent, hints, parentDossier);
   let executionPlanWithEvaluation = uniquePlan(executionPlan.concat(['coach_evaluator']));
   dossier.noteHumanEvent(reqDossier, 'execution_plan', executionPlan.join(' -> '));
+  const workerInvocationMode = invocationBackend.resolveWorkerInvocationMode(input?.worker_invocation_mode, ctx);
+  dossier.noteHumanEvent(reqDossier, 'worker_invocation_mode', workerInvocationMode);
   dossier.setExecutionPlanTelemetry(reqDossier, executionPlanWithEvaluation);
   dossier.noteStageStatus(reqDossier, 'plan', 'completed');
 
@@ -459,56 +483,60 @@ function orchestrateRequest(input, runtimeCtx) {
 
     dossier.noteStageStatus(reqDossier, worker, 'started');
 
-    if (!isWorkerAvailable(worker, ctx)) {
-      const skipped = adapters.adaptWorkerOutput(worker, {
-        request_id: reqDossier.request_id,
-        status: 'error',
-        summary: `${worker} unavailable`,
-        skipped: true,
-        warnings: [`${worker} unavailable`]
-      }, reqDossier.request_id);
-
-      dossier.recordWorkerOutput(reqDossier, worker, skipped);
-      dossier.noteStageStatus(reqDossier, worker, 'skipped');
-
-      if (worker === 'arbiter' && reviewRequired) {
-        dossier.markGuarded(reqDossier, 'arbiter_unavailable_for_substantive_flow');
-      }
-      continue;
-    }
-
     const startedAt = Date.now();
-    let raw;
-
+    let invocation;
     try {
-      raw = callWorker(worker, {
+      invocation = invocationBackend.invokeWorker({
+        worker,
+        mode: workerInvocationMode,
+        substantiveFlow,
         request_id: reqDossier.request_id,
-        user_message: reqDossier.user_message,
-        intent,
-        dossier: reqDossier,
-        parent_dossier: parentDossier,
-        retrieval_sources: reqDossier.retrieval_sources,
-        source_repo: ctx.sourceRepo || process.cwd()
-      }, ctx);
+        payload: {
+          request_id: reqDossier.request_id,
+          user_message: reqDossier.user_message,
+          intent,
+          dossier: reqDossier,
+          parent_dossier: parentDossier,
+          retrieval_sources: reqDossier.retrieval_sources,
+          source_repo: ctx.sourceRepo || process.cwd()
+        },
+        runtimeCtx: ctx,
+        callLocalWorker: callWorker
+      });
     } catch (err) {
-      raw = {
-        request_id: reqDossier.request_id,
-        status: 'error',
-        summary: `${worker} threw an exception`,
-        error: {
-          message: err instanceof Error ? err.message : String(err)
+      invocation = {
+        backend: 'none',
+        sessionId: null,
+        fallbackReason: 'invocation_exception',
+        raw: {
+          request_id: reqDossier.request_id,
+          status: 'error',
+          summary: `${worker} invocation failed`,
+          error: {
+            message: err instanceof Error ? err.message : String(err)
+          }
         }
       };
     }
 
-    const normalized = adapters.adaptWorkerOutput(worker, raw, reqDossier.request_id);
+    dossier.noteWorkerInvocation(reqDossier, worker, {
+      backend: invocation.backend,
+      sessionId: invocation.sessionId,
+      fallbackReason: invocation.fallbackReason
+    });
+
+    const normalized = adapters.adaptWorkerOutput(worker, invocation.raw, reqDossier.request_id);
     const elapsed = Date.now() - startedAt;
+    const fallbackEvent = normalized.telemetry_hints?.fallback_event || (
+      invocation.fallbackReason ? `${worker}:${invocation.fallbackReason}` : null
+    );
+    const servingModel = normalized.telemetry_hints?.serving_model || invocationBackend.resolveServingModel(worker, ctx);
 
     dossier.recordWorkerOutput(reqDossier, worker, normalized);
     dossier.mergeTelemetry(reqDossier, worker, {
       elapsed_time_ms: elapsed,
-      serving_model: normalized.telemetry_hints?.serving_model,
-      fallback_event: normalized.telemetry_hints?.fallback_event
+      serving_model: servingModel,
+      fallback_event: fallbackEvent
     });
 
     if (normalized.status === 'error') {
@@ -557,9 +585,14 @@ function orchestrateRequest(input, runtimeCtx) {
   dossier.setExecutionPlanTelemetry(reqDossier, executionPlanWithEvaluation);
 
   const provisionalAnswerBadge = formatAnswerBadge(dossier.resolveAnswerMode(reqDossier));
-  const checkerBadge = formatCheckerBadge(reqDossier.worker_outputs?.checker, executionPlan);
+  const evidencePresent = hasRetrievalEvidence(reqDossier);
+  if (substantiveFlow && !evidencePresent) {
+    dossier.noteHumanEvent(reqDossier, 'evidence', 'low_retrieval_evidence');
+  }
+  const checkerBadge = formatCheckerBadge(reqDossier.worker_outputs?.checker, executionPlan, reqDossier);
   const provisionalMarkers = [provisionalAnswerBadge];
   if (checkerBadge) provisionalMarkers.push(checkerBadge);
+  if (substantiveFlow && !evidencePresent) provisionalMarkers.push('[low evidence]');
   runCoachEvaluator(reqDossier, ctx, {
     statusMarkers: provisionalMarkers,
     executionPlan: executionPlanWithEvaluation
@@ -569,13 +602,15 @@ function orchestrateRequest(input, runtimeCtx) {
   const answerBadge = formatAnswerBadge(reqDossier.answer_mode);
   const statusMarkers = [answerBadge];
   if (checkerBadge) statusMarkers.push(checkerBadge);
+  if (substantiveFlow && !evidencePresent) statusMarkers.push('[low evidence]');
   dossier.finalizeSelfImprovementTelemetry(reqDossier, { statusMarkers });
   dossier.saveDossier(reqDossier, { runtimeRoot: ctx.runtimeRoot });
   const finalMessage = composeFinalMessage({
     dossier: reqDossier,
     statusMarkers,
     checkerBadge,
-    substantiveFlow
+    substantiveFlow,
+    lowEvidence: substantiveFlow && !evidencePresent
   });
 
   return {
@@ -595,6 +630,7 @@ module.exports = {
   formatAnswerBadge,
   formatCheckerBadge,
   composeFinalMessage,
+  hasRetrievalEvidence,
   loadLikelyParentDossier,
   planForIntent,
   callWorker,

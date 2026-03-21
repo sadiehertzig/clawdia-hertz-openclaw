@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const DEFAULT_RUNTIME_ROOT = path.resolve(__dirname, '..', '..', '..', 'runtime_state', 'dossiers', 'sessions');
-const DOSSIER_SCHEMA_VERSION = 2;
+const DOSSIER_SCHEMA_VERSION = 3;
 const OUTCOME_LABELS = new Set(['unknown', 'worked', 'partially_worked', 'failed', 'unsafe']);
 const OUTCOME_SOURCES = new Set(['system', 'manual', 'reaction', 'user_follow_up', 'follow_up_inference']);
 const SAFE_ID_RE = /^[A-Za-z0-9._-]{1,128}$/;
@@ -171,6 +171,15 @@ function normalizeDossierShape(raw) {
   }
 
   ensureSelfImprovementState(dossier);
+  dossier.worker_backend_by_stage = dossier.worker_backend_by_stage && typeof dossier.worker_backend_by_stage === 'object'
+    ? dossier.worker_backend_by_stage
+    : {};
+  dossier.worker_session_id_by_stage = dossier.worker_session_id_by_stage && typeof dossier.worker_session_id_by_stage === 'object'
+    ? dossier.worker_session_id_by_stage
+    : {};
+  dossier.fallback_reason_by_stage = dossier.fallback_reason_by_stage && typeof dossier.fallback_reason_by_stage === 'object'
+    ? dossier.fallback_reason_by_stage
+    : {};
   return dossier;
 }
 
@@ -327,6 +336,9 @@ function createInitialDossier(options) {
     retrieval_sources: [],
     serving_model_by_stage: {},
     fallback_events: [],
+    worker_backend_by_stage: {},
+    worker_session_id_by_stage: {},
+    fallback_reason_by_stage: {},
     final_status: 'in_progress',
     review_state: {
       review_completed: false,
@@ -406,6 +418,60 @@ function setExecutionPlanTelemetry(dossier, executionPlan) {
   state.telemetry.route = String(dossier.route || state.telemetry.route || 'unclassified');
   dossier.timestamps = dossier.timestamps || {};
   dossier.timestamps.updated_at = nowIso();
+  ensureInvocationTelemetryForPlan(dossier);
+  return dossier;
+}
+
+function normalizeBackendLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'local' || normalized === 'spawned' || normalized === 'none') return normalized;
+  return 'none';
+}
+
+function ensureInvocationMaps(dossier) {
+  if (!dossier) return dossier;
+  dossier.worker_backend_by_stage = dossier.worker_backend_by_stage && typeof dossier.worker_backend_by_stage === 'object'
+    ? dossier.worker_backend_by_stage
+    : {};
+  dossier.worker_session_id_by_stage = dossier.worker_session_id_by_stage && typeof dossier.worker_session_id_by_stage === 'object'
+    ? dossier.worker_session_id_by_stage
+    : {};
+  dossier.fallback_reason_by_stage = dossier.fallback_reason_by_stage && typeof dossier.fallback_reason_by_stage === 'object'
+    ? dossier.fallback_reason_by_stage
+    : {};
+  return dossier;
+}
+
+function ensureInvocationTelemetryForPlan(dossier) {
+  if (!dossier) return dossier;
+  ensureInvocationMaps(dossier);
+  const plan = asArray(dossier?.self_improvement?.telemetry?.execution_plan).map((x) => String(x));
+
+  for (const stage of plan) {
+    if (!stage) continue;
+    if (!Object.prototype.hasOwnProperty.call(dossier.worker_backend_by_stage, stage)) {
+      dossier.worker_backend_by_stage[stage] = 'none';
+    }
+    if (!Object.prototype.hasOwnProperty.call(dossier.worker_session_id_by_stage, stage)) {
+      dossier.worker_session_id_by_stage[stage] = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(dossier.fallback_reason_by_stage, stage)) {
+      dossier.fallback_reason_by_stage[stage] = null;
+    }
+  }
+
+  return dossier;
+}
+
+function noteWorkerInvocation(dossier, stage, details) {
+  if (!dossier || !stage) return dossier;
+  const info = details || {};
+  ensureInvocationMaps(dossier);
+  dossier.worker_backend_by_stage[stage] = normalizeBackendLabel(info.backend);
+  dossier.worker_session_id_by_stage[stage] = info.sessionId == null ? null : String(info.sessionId);
+  dossier.fallback_reason_by_stage[stage] = info.fallbackReason == null ? null : String(info.fallbackReason).slice(0, 200);
+  dossier.timestamps = dossier.timestamps || {};
+  dossier.timestamps.updated_at = nowIso();
   return dossier;
 }
 
@@ -479,11 +545,14 @@ function recordWorkerOutput(dossier, worker, result) {
     }
   }
 
-  if (normalizedResult.contract_flags?.reviewed) {
+  if (normalizedResult.status !== 'error' && worker === 'arbiter' && normalizedResult.contract_flags?.reviewed) {
     markReviewCompleted(dossier, worker);
   }
 
-  if (normalizedResult.contract_flags?.escalated) {
+  if (normalizedResult.status !== 'error' && (
+    (worker === 'arbiter' && normalizedResult.contract_flags?.escalated) ||
+    (worker === 'deepdebug' && normalizedResult.contract_flags?.escalated)
+  )) {
     markEscalated(dossier, worker);
   }
 
@@ -590,6 +659,7 @@ function finalizeSelfImprovementTelemetry(dossier, options) {
 
   const checkerOverall = dossier?.worker_outputs?.checker?.overall_status;
   state.telemetry.checker_status = checkerOverall ? String(checkerOverall) : state.telemetry.checker_status || null;
+  ensureInvocationTelemetryForPlan(dossier);
 
   return dossier;
 }
@@ -693,6 +763,18 @@ function renderHumanDossierNote(dossier) {
   const qualityText = qualityOverall == null ? 'n/a' : String(qualityOverall);
   const outcomeLabel = d.self_improvement?.outcome?.label || 'unknown';
   const outcomeSource = d.self_improvement?.outcome?.source || 'system';
+  const invocationEntries = [];
+  const plan = asArray(d?.self_improvement?.telemetry?.execution_plan).map((x) => String(x));
+  const dedupedStages = Array.from(new Set(plan.concat(Object.keys(d.worker_backend_by_stage || {}))));
+  for (const stage of dedupedStages) {
+    const backend = d?.worker_backend_by_stage?.[stage] || 'none';
+    const sid = d?.worker_session_id_by_stage?.[stage];
+    const fallback = d?.fallback_reason_by_stage?.[stage];
+    const extras = [];
+    if (sid) extras.push(`sid=${sid}`);
+    if (fallback) extras.push(`fb=${fallback}`);
+    invocationEntries.push(`${stage}=${backend}${extras.length ? `(${extras.join(';')})` : ''}`);
+  }
 
   return [
     `# Request ${d.request_id || 'unknown'}`,
@@ -701,6 +783,7 @@ function renderHumanDossierNote(dossier) {
     `- workers: ${workers.join(', ') || 'none'}`,
     `- answer mode: ${d.answer_mode || resolveAnswerMode(d)}`,
     `- state: ${keyState.join('; ') || 'none'}`,
+    `- invocation: ${invocationEntries.join(', ') || 'none'}`,
     `- quality overall: ${qualityText}`,
     `- outcome: ${outcomeLabel} (${outcomeSource})`
   ].join('\n');
@@ -861,6 +944,7 @@ module.exports = {
   noteStageStatus,
   noteHumanEvent,
   setExecutionPlanTelemetry,
+  noteWorkerInvocation,
   mergeTelemetry,
   recordWorkerOutput,
   attachParentDossier,

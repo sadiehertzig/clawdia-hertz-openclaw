@@ -182,8 +182,9 @@ function adaptArbiterOutput(raw, requestId) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const verdict = ['approve', 'revise', 'escalate'].includes(source.verdict) ? source.verdict : 'revise';
 
-  const reviewed = verdict === 'approve' || verdict === 'revise';
-  const escalated = verdict === 'escalate';
+  const statusIsError = source.status === 'error' || Boolean(source.error);
+  const reviewed = !statusIsError && (verdict === 'approve' || verdict === 'revise');
+  const escalated = !statusIsError && verdict === 'escalate';
 
   const envelope = normalizeEnvelope('arbiter', requestId, source, {
     kind: 'review',
@@ -205,14 +206,15 @@ function adaptArbiterOutput(raw, requestId) {
 
 function adaptDeepDebugOutput(raw, requestId) {
   const source = raw && typeof raw === 'object' ? raw : {};
+  const statusIsError = source.status === 'error' || Boolean(source.error);
 
   const envelope = normalizeEnvelope('deepdebug', requestId, source, {
     kind: 'escalation',
     summary: source.summary || 'deepdebug escalation complete',
     contract_flags: {
       reviewed: false,
-      escalated: true,
-      implementation_safe: Boolean(source.contract_flags?.implementation_safe),
+      escalated: !statusIsError,
+      implementation_safe: !statusIsError && Boolean(source.contract_flags?.implementation_safe),
       pattern_only: false
     }
   });

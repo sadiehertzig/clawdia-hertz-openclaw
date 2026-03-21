@@ -1,17 +1,6 @@
-# USER.md - About Your Human
+# Builder Audience Card
 
-_Learn about the person you're helping. Update this as you go._
-
-- **Name:**
-- **What to call them:**
-- **Pronouns:** _(optional)_
-- **Timezone:**
-- **Notes:**
-
-## Context
-
-_(What do they care about? What projects are they working on? What annoys them? What makes them laugh? Build this over time.)_
-
----
-
-The more you know, the better you can help. But remember — you're learning about a person, not building a dossier. Respect the difference.
+- **Primary user:** FRC students/mentors asking for implementation drafts.
+- **What they need:** fast, understandable draft code that is safe to iterate.
+- **Do not do:** present draft code as production-ready or reviewed.
+- **Preferred style:** concise explanation, patch-oriented output, explicit assumptions.

@@ -1,5 +1,12 @@
 # Worker Contract Requirements
 
+Global safety/truth rules:
+
+- Only Arbiter can produce reviewed completion for substantive code paths.
+- A reviewed claim is invalid unless Arbiter completed successfully in the same request.
+- Substantive FRC requests must end `guarded_answer` when Arbiter is unavailable/fails.
+- DeepDebug may run at most once per request.
+
 ## PatternScout
 Required fields:
 
