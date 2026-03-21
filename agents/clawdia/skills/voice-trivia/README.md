@@ -33,7 +33,8 @@ node index.js
 ### Environment Variables
 
 - `TRIVIA_PORT` — Server port (default: 3456)
-- `TRIVIA_VOICE_BASE_URL` — Public URL for the Mini App (e.g., Cloudflare tunnel)
+- `APP_BASE_URL` — Public URL for the Mini App (e.g., Cloudflare tunnel)
+- `TRIVIA_VOICE_BASE_URL` — Legacy alias for `APP_BASE_URL` (supported as fallback)
 - `OPENCLAW_TELEGRAM_BOT_TOKEN` — Telegram bot token
 - `OPENCLAW_TELEGRAM_CHAT_ID` — Chat ID for startup button (optional)
 - `OPENAI_API_KEY` — Required for Realtime API voice sessions

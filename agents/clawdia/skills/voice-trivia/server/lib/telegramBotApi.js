@@ -3,7 +3,11 @@ function apiUrl(method) {
 }
 
 export async function sendLauncherButton(chatId) {
-  const miniAppUrl = `${process.env.APP_BASE_URL}/miniapp/`;
+  const appBaseUrl = process.env.APP_BASE_URL || process.env.TRIVIA_VOICE_BASE_URL;
+  if (!appBaseUrl) {
+    throw new Error("Missing APP_BASE_URL (or TRIVIA_VOICE_BASE_URL)");
+  }
+  const miniAppUrl = `${appBaseUrl}/miniapp/`;
   const res = await fetch(apiUrl("sendMessage"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

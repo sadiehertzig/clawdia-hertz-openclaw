@@ -11,7 +11,7 @@ user-invocable: true
 Use bash to POST to the Trivia Voice server's `/api/launch` endpoint:
 
 ```bash
-curl -s -X POST "http://127.0.0.1:3456/api/launch" \
+curl -fsS -X POST "http://127.0.0.1:3456/api/launch" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${OPENCLAW_GATEWAY_TOKEN}" \
   -d '{}'
