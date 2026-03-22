@@ -8,6 +8,7 @@ import { ensureOnDemandTunnel } from "../lib/tunnelManager.js";
 export const referralStore = new Map<string, {
   referrerId: string | null;
   groupId: string | null;
+  intendedUserId: string | null;
   launchUrl: string;
   expiresAt: string;
 }>();
@@ -19,7 +20,7 @@ const router = Router();
  * Called by the host bot (via web_fetch) when someone invokes /copylobsta.
  * Starts/uses an on-demand Cloudflare tunnel and sends a launcher button.
  * Authenticated via x-launch-secret header.
- * Body: { chat_id?, referrer_id?, group_id? }
+ * Body: { chat_id?, referrer_id?, group_id?, user_id? }
  */
 router.post("/api/launch", async (req, res) => {
   try {
@@ -51,6 +52,14 @@ router.post("/api/launch", async (req, res) => {
 
     const referrerId = req.body?.referrer_id || null;
     const groupId = req.body?.group_id || null;
+    const requestedUserId = req.body?.user_id || null;
+    const userId = requestedUserId || (!groupId ? chatId : null);
+    if (!userId) {
+      res.status(400).json({
+        error: "missing user_id for group launch",
+      });
+      return;
+    }
 
     const tunnel = await ensureOnDemandTunnel(String(chatId));
 
@@ -58,6 +67,7 @@ router.post("/api/launch", async (req, res) => {
     referralStore.set(startParam, {
       referrerId,
       groupId,
+      intendedUserId: String(userId),
       launchUrl: tunnel.url,
       expiresAt: tunnel.expiresAt,
     });
@@ -69,7 +79,7 @@ router.post("/api/launch", async (req, res) => {
       }
     }
 
-    await sendLauncherButton(chatId, startParam, tunnel.url);
+    await sendLauncherButton(chatId, startParam, tunnel.url, userId);
     res.json({ ok: true, startParam, launchUrl: tunnel.url, expiresAt: tunnel.expiresAt });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

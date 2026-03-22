@@ -2,6 +2,7 @@
 export declare const referralStore: Map<string, {
     referrerId: string | null;
     groupId: string | null;
+    intendedUserId: string | null;
     launchUrl: string;
     expiresAt: string;
 }>;

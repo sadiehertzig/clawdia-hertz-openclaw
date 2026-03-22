@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { BOT_TOKEN, SHARING_ENABLED } from "../config.js";
-import { requireTelegramUser } from "../lib/telegramAuth.js";
+import {
+  requireUser,
+  issueSessionToken,
+  type TelegramUser,
+} from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { getStepNumber, TOTAL_STEPS } from "../lib/stateMachine.js";
 import { referralStore } from "./launch.js";
@@ -9,29 +13,57 @@ const router = Router();
 
 /**
  * POST /api/session
- * Called by the Mini App on load. Validates initData, creates or resumes session.
- * Body: { startParam?: string } — deep-link token from launcher
- * Returns the session state so the Mini App knows which screen to show.
+ * Called by the Mini App on load. Validates initData (or session token), creates
+ * or resumes session. If auth is missing and a startParam is provided, the
+ * request is allowed only when the launch link is identity-bound.
+ *
+ * Body: { startParam?: string }
+ * Returns the session state + a sessionToken the client must store.
  */
 router.post("/api/session", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const { startParam } = req.body as { startParam?: string } || {};
+
+    let user: TelegramUser;
+    let newToken: string | undefined;
+
+    // Try initData or existing session token first
+    try {
+      user = requireUser(initData, sessionToken, BOT_TOKEN);
+    } catch {
+      // Neither initData nor session token — check for valid startParam
+      const referral = startParam ? referralStore.get(startParam) : undefined;
+      if (referral) {
+        if (!referral.intendedUserId) {
+          throw new Error("This launch link is missing a bound Telegram user. Relaunch /copylobsta.");
+        }
+        throw new Error("This launch link is bound to a Telegram user. Re-open from the bot message inside Telegram.");
+      } else {
+        throw new Error("missing initData");
+      }
+    }
+
+    // Issue a session token (client stores it for subsequent requests)
+    newToken = issueSessionToken(user);
 
     let session = sessionStore.getOrCreate(user.id, user.username || null);
 
     // Check for stale sessions (14 days inactive) — mark as abandoned
     if (sessionStore.isStale(session) && !["COMPLETE", "ABANDONED", "FAILED"].includes(session.state)) {
       sessionStore.update(user.id, { state: "ABANDONED" as const });
-      // Start fresh with a new welcome session.
       session = sessionStore.reset(user.id, user.username || null);
     }
 
-    // Bind referral context from deep-link start param (first load only)
-    const { startParam } = req.body as { startParam?: string } || {};
-    if (startParam && !session.referrerTelegramId) {
+    // Bind referral context from deep-link start param.
+    if (startParam) {
       const referral = referralStore.get(startParam);
       if (referral) {
+        if (referral.intendedUserId && user.id !== Number(referral.intendedUserId)) {
+          throw new Error("This launch link belongs to a different Telegram user.");
+        }
+
         sessionStore.update(user.id, {
           referrerTelegramId: referral.referrerId ? Number(referral.referrerId) : null,
           groupChatId: referral.groupId ? Number(referral.groupId) : null,
@@ -48,13 +80,11 @@ router.post("/api/session", (req, res) => {
       }
     }
 
-    // Determine if this is a resuming session (existing + in progress)
     const isResuming = session.state !== "WELCOME" && !["COMPLETE", "ABANDONED", "FAILED"].includes(session.state);
-
-    // Re-read session in case referral context was just bound
     const current = sessionStore.get(user.id) || session;
 
     res.json({
+      sessionToken: newToken,
       session: {
         sessionId: current.sessionId,
         state: current.state,

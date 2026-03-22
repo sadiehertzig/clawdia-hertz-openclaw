@@ -1,10 +1,37 @@
 // CopyLobsta Mini App — client-side JavaScript
 const tg = window.Telegram?.WebApp;
 const API_BASE = window.location.origin;
+const SESSION_TOKEN_STORAGE_KEY = "copylobsta_session_token";
+
+function loadStoredSessionToken() {
+  try {
+    return window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionToken(token) {
+  try {
+    if (!token) {
+      window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+  } catch {
+    // Best-effort persistence only.
+  }
+}
 
 let currentSession = null;
 let setupToken = null;
+let sessionToken = loadStoredSessionToken(); // Issued by server for non-web_app opens (plain URL buttons)
 let pollTimer = null;
+let pollTimeoutTimer = null;
+let pollErrorCount = 0;
+
+const CALLBACK_POLL_INTERVAL_MS = 5000;
+const CALLBACK_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 // ============================================================
 // Interview question definitions
@@ -250,13 +277,14 @@ function getInitDataHeader() {
 }
 
 async function apiCall(method, path, body) {
-  const opts = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-telegram-init-data": getInitDataHeader(),
-    },
+  const headers = {
+    "Content-Type": "application/json",
+    "x-telegram-init-data": getInitDataHeader(),
   };
+  // Include session token for non-web_app opens (plain URL from group chats)
+  if (sessionToken) headers["x-session-token"] = sessionToken;
+
+  const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(`${API_BASE}${path}`, opts);
   const data = await res.json();
@@ -308,6 +336,10 @@ async function loadSession() {
     const urlParams = new URLSearchParams(window.location.search);
     const startParam = urlParams.get("start") || undefined;
     const data = await apiCall("POST", "/api/session", startParam ? { startParam } : undefined);
+    if (data.sessionToken) {
+      sessionToken = data.sessionToken;
+      persistSessionToken(sessionToken);
+    }
     currentSession = data.session;
     await checkForInstanceDetails();
 
@@ -373,8 +405,31 @@ async function handleAwsSignupDone() {
 async function handleCfnLaunch() {
   try {
     const data = await apiCall("GET", "/api/aws/quick-create-url");
+    const manualLink = document.getElementById("btn-aws-open-manual");
+    if (manualLink) {
+      manualLink.href = data.url;
+      manualLink.classList.remove("hidden");
+    }
+    const statusEl = document.getElementById("aws-launch-status");
+    if (statusEl) {
+      statusEl.classList.add("hidden");
+      statusEl.textContent = "";
+    }
+    document.getElementById("btn-aws-recheck")?.classList.add("hidden");
+
+    let launched = false;
+    if (tg?.openLink) {
+      tg.openLink(data.url);
+      launched = true;
+    } else {
+      const popup = window.open(data.url, "_blank");
+      launched = !!popup;
+    }
+    if (!launched) {
+      throw new Error("Could not open AWS Console. Please allow popups/links and tap Launch on AWS again.");
+    }
+
     setupToken = "pending";
-    window.open(data.url, "_blank");
     document.getElementById("aws-launch-info").classList.add("hidden");
     document.getElementById("aws-launch-waiting").classList.remove("hidden");
     startCallbackPolling();
@@ -383,14 +438,34 @@ async function handleCfnLaunch() {
   }
 }
 
+function clearAwsPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (pollTimeoutTimer) {
+    clearTimeout(pollTimeoutTimer);
+    pollTimeoutTimer = null;
+  }
+}
+
 function startCallbackPolling() {
-  if (pollTimer) clearInterval(pollTimer);
+  clearAwsPolling();
+  pollErrorCount = 0;
+
+  const statusEl = document.getElementById("aws-launch-status");
+  if (statusEl) {
+    statusEl.classList.add("hidden");
+    statusEl.textContent = "";
+  }
+  document.getElementById("btn-aws-recheck")?.classList.add("hidden");
+
   pollTimer = setInterval(async () => {
     try {
       const data = await apiCall("GET", "/api/aws/poll-callback");
+      pollErrorCount = 0;
       if (data.ready) {
-        clearInterval(pollTimer);
-        pollTimer = null;
+        clearAwsPolling();
         setupToken = "ready";
         currentSession.state = data.state;
         document.getElementById("aws-launch-waiting").classList.add("hidden");
@@ -398,9 +473,22 @@ function startCallbackPolling() {
         document.getElementById("instance-ip-display").textContent = data.instanceIp;
       }
     } catch {
-      // Keep polling
+      pollErrorCount += 1;
+      if (pollErrorCount >= 3 && statusEl) {
+        statusEl.classList.remove("hidden");
+        statusEl.textContent = "Still waiting for AWS callback. Make sure your CloudFormation stack is created and still running.";
+      }
     }
-  }, 5000);
+  }, CALLBACK_POLL_INTERVAL_MS);
+
+  pollTimeoutTimer = setTimeout(() => {
+    clearAwsPolling();
+    if (statusEl) {
+      statusEl.classList.remove("hidden");
+      statusEl.textContent = "Timed out waiting for server callback. Open CloudFormation and confirm the stack is CREATE_IN_PROGRESS or CREATE_COMPLETE, then tap Check Again.";
+    }
+    document.getElementById("btn-aws-recheck")?.classList.remove("hidden");
+  }, CALLBACK_POLL_TIMEOUT_MS);
 }
 
 async function handleAwsLaunchContinue() {
@@ -604,6 +692,9 @@ document.getElementById("btn-aws-signup-done")?.addEventListener("click", handle
 // AWS Launch
 document.getElementById("btn-cfn-launch")?.addEventListener("click", handleCfnLaunch);
 document.getElementById("btn-aws-launch-continue")?.addEventListener("click", handleAwsLaunchContinue);
+document.getElementById("btn-aws-recheck")?.addEventListener("click", () => {
+  startCallbackPolling();
+});
 
 // GitHub
 document.getElementById("btn-github-has-account")?.addEventListener("click", () => showPhase("github", 3));
