@@ -32,6 +32,13 @@ node_modules/
 # root runtime logs
 /logs/*.log
 
+# local operator notes and one-off ops files
+/memory/*.md
+/ops/
+
+# CopyLobsta runtime state (generated during onboarding flows)
+/agents/clawdia/skills/copylobsta/data/spotlight-history.json
+
 # autoimprove-tbc runtime outputs (generated)
 agents/clawdia/skills/autoimprove-tbc/targets/
 agents/clawdia/skills/autoimprove-tbc/_tg_offset
