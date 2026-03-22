@@ -15,6 +15,18 @@ export interface QuickCreateParams {
   instanceType?: string;
 }
 
+function isSupportedCloudFormationTemplateUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host.endsWith(".amazonaws.com") && host !== "amazonaws.com") return false;
+    return host === "s3.amazonaws.com" || host.startsWith("s3.") || host.includes(".s3.") || host.includes(".s3-");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Generate a CloudFormation quick-create URL.
  * Opens the AWS Console with the stack pre-configured and ready to launch.
@@ -24,7 +36,12 @@ export function buildQuickCreateUrl(params: QuickCreateParams): string {
   const templateUrl = params.templateUrl || CFN_TEMPLATE_URL;
 
   if (!templateUrl) {
-    throw new Error("CFN_TEMPLATE_URL is not configured. Set it in your environment.");
+    throw new Error("Template URL is not configured.");
+  }
+  if (!isSupportedCloudFormationTemplateUrl(templateUrl)) {
+    throw new Error(
+      "Template URL must be an HTTPS Amazon S3 URL (for example: https://<bucket>.s3.<region>.amazonaws.com/openclaw-runtime.yaml).",
+    );
   }
 
   const stackSuffix = randomBytes(4).toString("hex");

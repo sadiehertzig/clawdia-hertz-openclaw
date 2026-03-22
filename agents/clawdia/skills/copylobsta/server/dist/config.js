@@ -14,6 +14,10 @@ export const LAUNCH_SECRET = process.env.COPYLOBSTA_LAUNCH_SECRET || "";
 // AWS / CloudFormation
 export const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 export const CFN_TEMPLATE_URL = process.env.CFN_TEMPLATE_URL || "";
+export const TEMPLATE_S3_BUCKET = process.env.COPYLOBSTA_TEMPLATE_S3_BUCKET || "";
+export const TEMPLATE_S3_KEY = process.env.COPYLOBSTA_TEMPLATE_S3_KEY || "";
+export const TEMPLATE_S3_REGION = process.env.COPYLOBSTA_TEMPLATE_S3_REGION || AWS_REGION;
+export const TEMPLATE_URL_TTL_SECONDS = parseInt(process.env.COPYLOBSTA_TEMPLATE_URL_TTL_SECONDS || "600", 10);
 export const RELEASE_TAG = process.env.COPYLOBSTA_RELEASE_TAG || "main";
 export const SETUP_API_PORT = 8080;
 //# sourceMappingURL=config.js.map

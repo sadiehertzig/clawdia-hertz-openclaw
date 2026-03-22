@@ -7,6 +7,10 @@ export declare const SHARING_TTL_MINUTES: number;
 export declare const LAUNCH_SECRET: string;
 export declare const AWS_REGION: string;
 export declare const CFN_TEMPLATE_URL: string;
+export declare const TEMPLATE_S3_BUCKET: string;
+export declare const TEMPLATE_S3_KEY: string;
+export declare const TEMPLATE_S3_REGION: string;
+export declare const TEMPLATE_URL_TTL_SECONDS: number;
 export declare const RELEASE_TAG: string;
 export declare const SETUP_API_PORT = 8080;
 //# sourceMappingURL=config.d.ts.map

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 
-import { PORT } from "./config.js";
+import { CFN_TEMPLATE_URL, PORT, SHARING_ENABLED, TEMPLATE_S3_BUCKET, TEMPLATE_S3_KEY } from "./config.js";
 import { containsSecrets, redactSecrets } from "./lib/security.js";
 import healthRouter from "./routes/health.js";
 import launchRouter from "./routes/launch.js";
@@ -17,6 +17,17 @@ import userRouter from "./routes/user.js";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 
 const app = express();
+
+if (SHARING_ENABLED) {
+  const hasStaticTemplate = !!CFN_TEMPLATE_URL;
+  const hasPresignTemplate = !!TEMPLATE_S3_BUCKET && !!TEMPLATE_S3_KEY;
+  if (!hasStaticTemplate && !hasPresignTemplate) {
+    console.error(
+      "Missing template source: set COPYLOBSTA_TEMPLATE_S3_BUCKET + COPYLOBSTA_TEMPLATE_S3_KEY (recommended), or CFN_TEMPLATE_URL.",
+    );
+    process.exit(1);
+  }
+}
 
 // CORS: allow local dev + temporary Cloudflare Quick Tunnel origins.
 app.use(cors({

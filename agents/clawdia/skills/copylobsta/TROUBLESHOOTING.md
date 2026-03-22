@@ -2,6 +2,29 @@
 
 ## CloudFormation Stack Issues
 
+### "TemplateURL must be a supported URL"
+Your `CFN_TEMPLATE_URL` is not an AWS-supported template host for Quick Create.
+CloudFormation Quick Create expects an HTTPS **S3 object URL**, not `raw.githubusercontent.com`.
+1. Upload `infra/openclaw-runtime.yaml` to an S3 bucket
+2. Make the object readable for CloudFormation (public or signed access as needed)
+3. Set `CFN_TEMPLATE_URL` to the S3 object URL (example: `https://<bucket>.s3.<region>.amazonaws.com/openclaw-runtime.yaml`)
+4. Restart CopyLobsta service (`systemctl --user restart copylobsta`)
+5. Relaunch `/copylobsta` and tap **Launch on AWS** again
+
+### Recommended secure template source (pre-signed S3 URL)
+Instead of exposing a permanent public template URL, configure CopyLobsta to generate short-lived pre-signed URLs:
+1. Set `COPYLOBSTA_TEMPLATE_S3_BUCKET` and `COPYLOBSTA_TEMPLATE_S3_KEY` in `~/.openclaw/.env`
+2. Optional: set `COPYLOBSTA_TEMPLATE_S3_REGION` and `COPYLOBSTA_TEMPLATE_URL_TTL_SECONDS`
+3. Ensure the host IAM role/user can `s3:GetObject` for that bucket/key
+4. Restart CopyLobsta service (`systemctl --user restart copylobsta`)
+
+### "CFN_TEMPLATE_URL is not configured"
+CopyLobsta cannot generate the AWS launch link without a template URL.
+1. Prefer setting `COPYLOBSTA_TEMPLATE_S3_BUCKET` + `COPYLOBSTA_TEMPLATE_S3_KEY` for pre-signed URLs
+2. Or set `CFN_TEMPLATE_URL=...` to a valid S3 HTTPS URL
+2. Restart CopyLobsta service (`systemctl --user restart copylobsta`)
+3. Relaunch `/copylobsta` and tap **Launch on AWS** again
+
 ### Stack stuck in CREATE_IN_PROGRESS
 Wait up to 10 minutes. If it's been longer:
 1. Open AWS Console → CloudFormation → your stack

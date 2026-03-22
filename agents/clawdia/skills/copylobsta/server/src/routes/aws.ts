@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { BOT_TOKEN } from "../config.js";
-import { requireTelegramUser } from "../lib/telegramAuth.js";
+import { requireUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition } from "../lib/stateMachine.js";
 import { buildQuickCreateUrl, generateSessionToken } from "../lib/cfnUrl.js";
+import { resolveTemplateUrl } from "../lib/templateUrl.js";
+import { ensureOnDemandTunnel } from "../lib/tunnelManager.js";
 
 const router = Router();
 
@@ -15,7 +17,8 @@ const router = Router();
 router.post("/api/aws/check", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -45,10 +48,11 @@ router.post("/api/aws/check", (req, res) => {
  * GET /api/aws/quick-create-url
  * Generates a CloudFormation quick-create URL with a unique session token.
  */
-router.get("/api/aws/quick-create-url", (req, res) => {
+router.get("/api/aws/quick-create-url", async (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -56,18 +60,41 @@ router.get("/api/aws/quick-create-url", (req, res) => {
       return;
     }
 
-    const callbackBase = session.sharingSession?.launchUrl;
-    if (!callbackBase) {
+    const sharing = session.sharingSession;
+    if (!sharing) {
       res.status(400).json({
         error: "Sharing session is not active. Relaunch /copylobsta to start a new onboarding session.",
       });
       return;
     }
 
+    // Re-confirm tunnel on every quick-create request.
+    // This self-heals after service restarts because in-memory tunnel state is lost across restarts.
+    const chatKey = String(session.groupChatId ?? session.friendTelegramId);
+    const tunnel = await ensureOnDemandTunnel(chatKey);
+    let callbackBase = tunnel.url;
+    if (
+      sharing.launchUrl !== tunnel.url ||
+      sharing.expiresAt !== tunnel.expiresAt ||
+      sharing.status !== "active"
+    ) {
+      sessionStore.update(user.id, {
+        sharingSession: {
+          ...sharing,
+          launchUrl: tunnel.url,
+          expiresAt: tunnel.expiresAt,
+          tunnelPid: tunnel.pid,
+          status: "active",
+        },
+      });
+    }
+
     const token = generateSessionToken();
     sessionStore.update(user.id, { setupToken: token });
+    const templateUrl = await resolveTemplateUrl();
 
     const url = buildQuickCreateUrl({
+      templateUrl,
       sessionToken: token,
       callbackUrl: `${callbackBase}/api/aws/instance-callback`,
     });
@@ -136,7 +163,8 @@ router.post("/api/aws/instance-callback", (req, res) => {
 router.get("/api/aws/poll-callback", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -165,7 +193,8 @@ router.get("/api/aws/poll-callback", (req, res) => {
 router.post("/api/aws/proxy-validate", async (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -211,8 +240,9 @@ router.post("/api/aws/proxy-validate", async (req, res) => {
  */
 router.post("/api/aws/cfn-error", (req, res) => {
   const initData = req.headers["x-telegram-init-data"] as string || "";
+  const sessionToken = req.headers["x-session-token"] as string || "";
   try {
-    requireTelegramUser(initData, BOT_TOKEN);
+    requireUser(initData, sessionToken, BOT_TOKEN);
   } catch {
     res.status(401).json({ error: "unauthorized" });
     return;

@@ -34,6 +34,12 @@ node dist/index.js
 - `COPYLOBSTA_SHARING_MODE` — `disabled` (default) or `on_demand`
 - `COPYLOBSTA_LAUNCH_SECRET` — Shared secret required for `/api/launch`
 - `COPYLOBSTA_SHARING_TTL_MINUTES` — Optional on-demand tunnel lifetime (default: 45)
+- `COPYLOBSTA_TEMPLATE_S3_BUCKET` — Private S3 bucket for template (recommended)
+- `COPYLOBSTA_TEMPLATE_S3_KEY` — Template object key in S3 (recommended)
+- `COPYLOBSTA_TEMPLATE_S3_REGION` — S3 region for template bucket (optional; defaults to `AWS_REGION`)
+- `COPYLOBSTA_TEMPLATE_URL_TTL_SECONDS` — Pre-signed URL lifetime in seconds (default `600`)
+- `CFN_TEMPLATE_URL` — Static template URL fallback (use only if not using S3 pre-sign)
+- `AWS_REGION` — AWS region for quick-create link (default: `us-east-1`)
 - `OPENCLAW_TELEGRAM_BOT_TOKEN` — Telegram bot token
 - `OPENCLAW_TELEGRAM_CHAT_ID` — Default chat ID
 
