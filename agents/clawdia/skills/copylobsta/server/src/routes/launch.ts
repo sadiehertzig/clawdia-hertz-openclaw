@@ -9,6 +9,7 @@ export const referralStore = new Map<string, {
   referrerId: string | null;
   groupId: string | null;
   intendedUserId: string | null;
+  forceFresh: boolean;
   launchUrl: string;
   expiresAt: string;
 }>();
@@ -20,7 +21,7 @@ const router = Router();
  * Called by the host bot (via web_fetch) when someone invokes /copylobsta.
  * Starts/uses an on-demand Cloudflare tunnel and sends a launcher button.
  * Authenticated via x-launch-secret header.
- * Body: { chat_id?, referrer_id?, group_id?, user_id? }
+ * Body: { chat_id?, referrer_id?, group_id?, user_id?, fresh? }
  */
 router.post("/api/launch", async (req, res) => {
   try {
@@ -53,6 +54,8 @@ router.post("/api/launch", async (req, res) => {
     const referrerId = req.body?.referrer_id || null;
     const groupId = req.body?.group_id || null;
     const requestedUserId = req.body?.user_id || null;
+    const rawFresh = req.body?.fresh;
+    const forceFresh = rawFresh === true || rawFresh === "1" || rawFresh === 1;
     const userId = requestedUserId || (!groupId ? chatId : null);
     if (!userId) {
       res.status(400).json({
@@ -68,6 +71,7 @@ router.post("/api/launch", async (req, res) => {
       referrerId,
       groupId,
       intendedUserId: String(userId),
+      forceFresh,
       launchUrl: tunnel.url,
       expiresAt: tunnel.expiresAt,
     });
@@ -80,7 +84,7 @@ router.post("/api/launch", async (req, res) => {
     }
 
     await sendLauncherButton(chatId, startParam, tunnel.url, userId);
-    res.json({ ok: true, startParam, launchUrl: tunnel.url, expiresAt: tunnel.expiresAt });
+    res.json({ ok: true, startParam, launchUrl: tunnel.url, expiresAt: tunnel.expiresAt, forceFresh });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Launch error:", message);

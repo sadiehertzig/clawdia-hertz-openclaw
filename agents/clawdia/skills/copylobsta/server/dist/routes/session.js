@@ -11,14 +11,17 @@ const router = Router();
  * or resumes session. If auth is missing and a startParam is provided, the
  * request is allowed only when the launch link is identity-bound.
  *
- * Body: { startParam?: string }
+ * Body: { startParam?: string, fresh?: boolean | "1" }
  * Returns the session state + a sessionToken the client must store.
  */
 router.post("/api/session", (req, res) => {
     try {
         const initData = req.headers["x-telegram-init-data"] || "";
         const sessionToken = req.headers["x-session-token"] || "";
-        const { startParam } = req.body || {};
+        const body = (req.body || {});
+        const startParam = body.startParam;
+        const rawFresh = body.fresh;
+        const freshRequested = rawFresh === true || rawFresh === "1" || rawFresh === 1;
         let user;
         let newToken;
         // Try initData or existing session token first
@@ -38,9 +41,13 @@ router.post("/api/session", (req, res) => {
                 throw new Error("missing initData");
             }
         }
+        const referral = startParam ? referralStore.get(startParam) : undefined;
+        const forceFresh = freshRequested || !!referral?.forceFresh;
         // Issue a session token (client stores it for subsequent requests)
         newToken = issueSessionToken(user);
-        let session = sessionStore.getOrCreate(user.id, user.username || null);
+        let session = forceFresh
+            ? sessionStore.reset(user.id, user.username || null)
+            : sessionStore.getOrCreate(user.id, user.username || null);
         // Check for stale sessions (14 days inactive) — mark as abandoned
         if (sessionStore.isStale(session) && !["COMPLETE", "ABANDONED", "FAILED"].includes(session.state)) {
             sessionStore.update(user.id, { state: "ABANDONED" });
@@ -48,7 +55,6 @@ router.post("/api/session", (req, res) => {
         }
         // Bind referral context from deep-link start param.
         if (startParam) {
-            const referral = referralStore.get(startParam);
             if (referral) {
                 if (referral.intendedUserId && user.id !== Number(referral.intendedUserId)) {
                     throw new Error("This launch link belongs to a different Telegram user.");

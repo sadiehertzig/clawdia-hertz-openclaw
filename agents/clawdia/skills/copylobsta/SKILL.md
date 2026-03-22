@@ -8,9 +8,9 @@ user-invocable: true
 
 ## When the user invokes /copylobsta (Telegram group or DM)
 
-The Mini App launcher uses `inline_keyboard` with `web_app` buttons, which work in **both group chats and DMs**. Do NOT tell users to switch to DM — just send the button to whatever chat they're in.
-
 Use bash to POST to the local CopyLobsta server `/api/launch` endpoint.
+The `web_app` button only works in DMs. In group chats the server will
+automatically DM the user (using `user_id`) and post a notice in the group.
 
 **From a DM:**
 ```bash
@@ -20,12 +20,19 @@ curl -s -X POST "http://127.0.0.1:${COPYLOBSTA_PORT:-3457}/api/launch" \
   -d '{"chat_id":"<the chat id>"}'
 ```
 
-**From a group chat:** pass the group's chat ID as both `chat_id` and `group_id` so the server can send a completion notification back to the group.
+**From a group chat:** pass the group's chat ID as both `chat_id` and `group_id`,
+and always include `user_id` (the Telegram user ID of the person who invoked the
+command) so the server can DM them the setup button.
 ```bash
 curl -s -X POST "http://127.0.0.1:${COPYLOBSTA_PORT:-3457}/api/launch" \
   -H "Content-Type: application/json" \
   -H "x-launch-secret: ${COPYLOBSTA_LAUNCH_SECRET}" \
-  -d '{"chat_id":"<the group chat id>","group_id":"<the group chat id>"}'
+  -d '{"chat_id":"<the group chat id>","group_id":"<the group chat id>","user_id":"<invoking user telegram id>"}'
+
+# Optional: force a clean restart for this user only
+# Add "fresh": true to the JSON body.
+# Example:
+# -d '{"chat_id":"<group>","group_id":"<group>","user_id":"<user>","fresh":true}'
 ```
 
 The server will:
