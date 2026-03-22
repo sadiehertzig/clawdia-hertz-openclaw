@@ -70,6 +70,7 @@ export interface Session {
     approved: boolean;
   };
   setupToken: string | null; // token for setup API + callback auth
+  callbackSecret: string | null; // per-launch HMAC key for instance callback verification
   deploy: {
     startedAt: string | null;
     completedAt: string | null;

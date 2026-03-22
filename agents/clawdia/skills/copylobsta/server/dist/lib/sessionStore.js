@@ -72,6 +72,7 @@ function normalizeSession(session) {
             ...session.aws,
             setupBaseUrl: session.aws.setupBaseUrl || null,
         },
+        callbackSecret: session.callbackSecret || null,
         sharingEnabled: !!session.sharingEnabled,
         sharingSession: session.sharingSession || null,
     };
@@ -108,6 +109,7 @@ function createDefaultSession(userId, username) {
             botUsername: null,
         },
         setupToken: null,
+        callbackSecret: null,
         user: {
             answers: {},
             draftMarkdown: null,

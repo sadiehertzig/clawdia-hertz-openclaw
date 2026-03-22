@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { DEFAULT_CHAT_ID, LAUNCH_SECRET, SHARING_ENABLED } from "../config.js";
 import { sendLauncherButton } from "../lib/telegramBotApi.js";
@@ -15,6 +15,13 @@ export const referralStore = new Map<string, {
 }>();
 
 const router = Router();
+
+function safeSecretEquals(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
 
 /**
  * POST /api/launch
@@ -40,7 +47,7 @@ router.post("/api/launch", async (req, res) => {
     }
 
     const provided = req.headers["x-launch-secret"] as string || "";
-    if (provided !== LAUNCH_SECRET) {
+    if (!safeSecretEquals(provided, LAUNCH_SECRET)) {
       res.status(401).json({ error: "unauthorized" });
       return;
     }

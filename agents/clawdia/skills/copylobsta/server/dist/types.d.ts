@@ -47,6 +47,7 @@ export interface Session {
         approved: boolean;
     };
     setupToken: string | null;
+    callbackSecret: string | null;
     deploy: {
         startedAt: string | null;
         completedAt: string | null;

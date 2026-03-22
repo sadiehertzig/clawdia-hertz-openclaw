@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { accessSync, constants } from "node:fs";
+import { join } from "node:path";
 import { PORT, SHARING_TTL_MINUTES } from "../config.js";
 
 interface ActiveTunnel {
@@ -30,6 +32,20 @@ function killProcess(proc: ReturnType<typeof spawn>): void {
   }, KILL_GRACE_MS).unref();
 }
 
+function resolveCloudflaredBinary(): string {
+  const home = process.env.HOME || "";
+  const localCandidate = home ? join(home, ".local", "bin", "cloudflared") : "";
+  if (localCandidate) {
+    try {
+      accessSync(localCandidate, constants.X_OK);
+      return localCandidate;
+    } catch {
+      // Fall back to PATH lookup.
+    }
+  }
+  return "cloudflared";
+}
+
 export async function ensureOnDemandTunnel(key: string): Promise<{ url: string; expiresAt: string; pid: number | null }> {
   const existing = active.get(key);
   if (existing && Date.now() < new Date(existing.expiresAt).getTime()) {
@@ -40,9 +56,10 @@ export async function ensureOnDemandTunnel(key: string): Promise<{ url: string; 
 
   const ttlMs = Math.max(5, SHARING_TTL_MINUTES) * 60_000;
   const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+  const cloudflaredBin = resolveCloudflaredBinary();
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("cloudflared", ["tunnel", "--url", `http://127.0.0.1:${PORT}`, "--no-autoupdate"], {
+    const proc = spawn(cloudflaredBin, ["tunnel", "--url", `http://127.0.0.1:${PORT}`, "--no-autoupdate"], {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -75,6 +92,12 @@ export async function ensureOnDemandTunnel(key: string): Promise<{ url: string; 
 
     proc.stdout?.on("data", onOutput);
     proc.stderr?.on("data", onOutput);
+
+    proc.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`${cloudflaredBin} failed to start: ${err.message}`));
+    });
 
     proc.on("exit", (code) => {
       const current = active.get(key);

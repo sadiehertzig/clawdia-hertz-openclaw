@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { BOT_TOKEN } from "../config.js";
-import { requireTelegramUser } from "../lib/telegramAuth.js";
+import { requireUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition, getNextState, getStepNumber, TOTAL_STEPS } from "../lib/stateMachine.js";
 import type { SessionState, CredentialStatus } from "../types.js";
@@ -23,7 +23,8 @@ const PROVIDER_MAP: Record<string, { field: string; nextState: SessionState }> =
 router.post("/api/credentials/github", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -64,7 +65,8 @@ router.post("/api/credentials/github", (req, res) => {
 router.post("/api/credentials/status", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {

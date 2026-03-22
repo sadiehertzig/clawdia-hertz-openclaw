@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { BOT_TOKEN } from "../config.js";
-import { requireTelegramUser } from "../lib/telegramAuth.js";
+import { requireUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition, getNextState, getStepNumber, TOTAL_STEPS } from "../lib/stateMachine.js";
 import { stopTunnelByUrl } from "../lib/tunnelManager.js";
@@ -16,7 +16,8 @@ const router = Router();
 router.post("/api/step", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {

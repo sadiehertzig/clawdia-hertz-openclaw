@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { BOT_TOKEN } from "../config.js";
-import { requireTelegramUser } from "../lib/telegramAuth.js";
+import { requireUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition, getStepNumber, TOTAL_STEPS } from "../lib/stateMachine.js";
 import { sendMessage } from "../lib/telegramBotApi.js";
@@ -15,7 +15,8 @@ const router = Router();
 router.post("/api/soul/answers", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -64,7 +65,8 @@ router.post("/api/soul/answers", (req, res) => {
 router.post("/api/soul/approve", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -109,7 +111,8 @@ router.post("/api/soul/approve", (req, res) => {
 router.post("/api/soul/deploy", async (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -203,7 +206,8 @@ router.post("/api/soul/deploy", async (req, res) => {
 router.get("/api/deploy/status", async (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {
@@ -235,7 +239,8 @@ router.get("/api/deploy/status", async (req, res) => {
 router.post("/api/soul/complete", (req, res) => {
   try {
     const initData = req.headers["x-telegram-init-data"] as string || "";
-    const user = requireTelegramUser(initData, BOT_TOKEN);
+    const sessionToken = req.headers["x-session-token"] as string || "";
+    const user = requireUser(initData, sessionToken, BOT_TOKEN);
 
     const session = sessionStore.get(user.id);
     if (!session) {

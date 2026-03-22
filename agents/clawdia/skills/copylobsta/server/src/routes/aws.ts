@@ -1,3 +1,5 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Request } from "express";
 import { Router } from "express";
 import { BOT_TOKEN } from "../config.js";
 import { requireUser } from "../lib/telegramAuth.js";
@@ -8,6 +10,44 @@ import { resolveTemplateUrl } from "../lib/templateUrl.js";
 import { ensureOnDemandTunnel } from "../lib/tunnelManager.js";
 
 const router = Router();
+const ALLOWED_PROVIDERS = new Set(["anthropic", "gemini", "openai", "telegram"]);
+type RawBodyRequest = Request & { rawBody?: string };
+
+function isAllowedSetupHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === "localhost" || host === "127.0.0.1" || host.endsWith(".trycloudflare.com");
+}
+
+function normalizeSetupBaseUrl(raw: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error("Invalid setupBaseUrl");
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error("setupBaseUrl must use http or https");
+  }
+  if (!isAllowedSetupHost(parsed.hostname)) {
+    throw new Error("setupBaseUrl host is not allowed");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("setupBaseUrl must not contain embedded credentials");
+  }
+  parsed.hash = "";
+  return parsed.origin;
+}
+
+function safeEquals(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+function computeCallbackSignature(secret: string, payload: string): string {
+  return createHmac("sha256", secret).update(payload).digest("hex");
+}
 
 /**
  * POST /api/aws/check
@@ -90,12 +130,14 @@ router.get("/api/aws/quick-create-url", async (req, res) => {
     }
 
     const token = generateSessionToken();
-    sessionStore.update(user.id, { setupToken: token });
+    const callbackSecret = generateSessionToken();
+    sessionStore.update(user.id, { setupToken: token, callbackSecret });
     const templateUrl = await resolveTemplateUrl();
 
     const url = buildQuickCreateUrl({
       templateUrl,
       sessionToken: token,
+      callbackSecret,
       callbackUrl: `${callbackBase}/api/aws/instance-callback`,
     });
 
@@ -113,6 +155,8 @@ router.get("/api/aws/quick-create-url", async (req, res) => {
  */
 router.post("/api/aws/instance-callback", (req, res) => {
   try {
+    const signatureHeader = req.headers["x-callback-signature"];
+    const providedSignature = Array.isArray(signatureHeader) ? signatureHeader[0] : (signatureHeader || "");
     const { sessionToken, instanceId, instanceIp, setupBaseUrl } = req.body as {
       sessionToken?: string;
       instanceId?: string;
@@ -124,23 +168,38 @@ router.post("/api/aws/instance-callback", (req, res) => {
       res.status(400).json({ error: "Missing sessionToken, instanceId, or setupBaseUrl" });
       return;
     }
+    if (!providedSignature) {
+      res.status(401).json({ error: "Missing callback signature" });
+      return;
+    }
 
     const session = sessionStore.findBySetupToken(sessionToken);
     if (!session) {
       res.status(401).json({ error: "Invalid session token" });
       return;
     }
+    if (!session.callbackSecret) {
+      res.status(401).json({ error: "Callback signature is not configured for this session" });
+      return;
+    }
+    const rawPayload = (req as RawBodyRequest).rawBody ?? JSON.stringify(req.body || {});
+    const expectedSignature = computeCallbackSignature(session.callbackSecret, rawPayload);
+    if (!safeEquals(providedSignature, expectedSignature)) {
+      res.status(401).json({ error: "Invalid callback signature" });
+      return;
+    }
+    const safeSetupBaseUrl = normalizeSetupBaseUrl(setupBaseUrl);
 
     const updated = sessionStore.update(session.friendTelegramId, {
       aws: {
         ...session.aws,
         instanceId,
         instanceIp: instanceIp || null,
-        setupBaseUrl,
+        setupBaseUrl: safeSetupBaseUrl,
         ssmVerified: true,
       },
       sharingSession: session.sharingSession
-        ? { ...session.sharingSession, setupBaseUrl }
+        ? { ...session.sharingSession, setupBaseUrl: safeSetupBaseUrl }
         : session.sharingSession,
     });
 
@@ -212,8 +271,12 @@ router.post("/api/aws/proxy-validate", async (req, res) => {
       res.status(400).json({ error: "Missing provider or key" });
       return;
     }
+    if (!ALLOWED_PROVIDERS.has(provider)) {
+      res.status(400).json({ error: "Unsupported provider" });
+      return;
+    }
 
-    const setupUrl = `${session.aws.setupBaseUrl}/setup/validate-key`;
+    const setupUrl = new URL("/setup/validate-key", session.aws.setupBaseUrl).toString();
     const upstream = await fetch(setupUrl, {
       method: "POST",
       headers: {

@@ -7,6 +7,7 @@ export interface QuickCreateParams {
     templateUrl?: string;
     callbackUrl: string;
     sessionToken: string;
+    callbackSecret: string;
     budgetEmail?: string;
     instanceType?: string;
 }

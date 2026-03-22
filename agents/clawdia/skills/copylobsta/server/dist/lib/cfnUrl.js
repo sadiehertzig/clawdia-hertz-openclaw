@@ -38,6 +38,7 @@ export function buildQuickCreateUrl(params) {
     qs.set("stackName", stackName);
     qs.set("param_CallbackUrl", params.callbackUrl);
     qs.set("param_SessionToken", params.sessionToken);
+    qs.set("param_CallbackSecret", params.callbackSecret);
     qs.set("param_RepoRef", RELEASE_TAG);
     if (params.budgetEmail) {
         qs.set("param_BudgetAlertEmail", params.budgetEmail);
