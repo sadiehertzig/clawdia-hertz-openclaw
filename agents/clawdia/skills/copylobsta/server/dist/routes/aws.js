@@ -183,7 +183,7 @@ router.post("/api/aws/instance-callback", (req, res) => {
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("Instance callback error:", message);
-        res.status(500).json({ error: message });
+        res.status(500).json({ error: "Instance callback failed. Please retry launch if this continues." });
     }
 });
 /**
@@ -295,9 +295,9 @@ router.post("/api/aws/cfn-error", (req, res) => {
         friendly = "A stack with this name already exists. Either delete the old stack first (CloudFormation -> select stack -> Delete), or use a different name.";
     }
     else {
-        friendly = `AWS returned an error: ${msg || code || "unknown error"}. Check the CloudFormation Events tab for details.`;
+        friendly = "AWS returned an error. Check the CloudFormation Events tab for details, then try again.";
     }
-    res.json({ friendlyError: friendly, rawError: msg || code });
+    res.json({ friendlyError: friendly });
 });
 export default router;
 //# sourceMappingURL=aws.js.map

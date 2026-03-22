@@ -2,10 +2,36 @@
 const tg = window.Telegram?.WebApp;
 const API_BASE = window.location.origin;
 const SESSION_TOKEN_STORAGE_KEY = "copylobsta_session_token";
+const SESSION_TOKEN_META_KEY = "copylobsta_session_meta";
+const CLIENT_TOKEN_MAX_AGE_MS = 110 * 60 * 1000; // Keep client-side lifetime shorter than server TTL (2h).
 
 function loadStoredSessionToken() {
   try {
-    return window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY) || null;
+    const rawMeta = window.localStorage.getItem(SESSION_TOKEN_META_KEY);
+    if (rawMeta) {
+      const meta = JSON.parse(rawMeta);
+      if (!meta?.token || !meta?.issuedAt) {
+        window.localStorage.removeItem(SESSION_TOKEN_META_KEY);
+        window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        return null;
+      }
+      if (Date.now() - Number(meta.issuedAt) > CLIENT_TOKEN_MAX_AGE_MS) {
+        window.localStorage.removeItem(SESSION_TOKEN_META_KEY);
+        window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+        return null;
+      }
+      return String(meta.token);
+    }
+    // Backward compatibility for old single-key token storage.
+    const legacyToken = window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+    if (legacyToken) {
+      window.localStorage.setItem(
+        SESSION_TOKEN_META_KEY,
+        JSON.stringify({ token: legacyToken, issuedAt: Date.now() }),
+      );
+      return legacyToken;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -15,9 +41,14 @@ function persistSessionToken(token) {
   try {
     if (!token) {
       window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(SESSION_TOKEN_META_KEY);
       return;
     }
     window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    window.localStorage.setItem(
+      SESSION_TOKEN_META_KEY,
+      JSON.stringify({ token, issuedAt: Date.now() }),
+    );
   } catch {
     // Best-effort persistence only.
   }
@@ -29,6 +60,7 @@ let sessionToken = loadStoredSessionToken(); // Issued by server for non-web_app
 let pollTimer = null;
 let pollTimeoutTimer = null;
 let pollErrorCount = 0;
+let sessionRefreshInFlight = null;
 
 const CALLBACK_POLL_INTERVAL_MS = 5000;
 const CALLBACK_POLL_TIMEOUT_MS = 15 * 60 * 1000;
@@ -276,6 +308,41 @@ function getInitDataHeader() {
   return tg?.initData || "";
 }
 
+async function refreshSessionAfterAuthFailure() {
+  if (sessionRefreshInFlight) return sessionRefreshInFlight;
+  sessionRefreshInFlight = (async () => {
+    persistSessionToken(null);
+    sessionToken = null;
+    const headers = {
+      "Content-Type": "application/json",
+      "x-telegram-init-data": getInitDataHeader(),
+    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const startParam = urlParams.get("start") || undefined;
+    const refreshRes = await fetch(`${API_BASE}/api/session`, {
+      method: "POST",
+      headers,
+      body: startParam ? JSON.stringify({ startParam }) : undefined,
+    });
+    const refreshData = await refreshRes.json().catch(() => ({}));
+    if (!refreshRes.ok) {
+      throw new Error(refreshData.error || "Session expired. Re-open from Telegram.");
+    }
+    if (refreshData.sessionToken) {
+      sessionToken = refreshData.sessionToken;
+      persistSessionToken(sessionToken);
+    }
+    currentSession = refreshData.session || currentSession;
+    return true;
+  })();
+
+  try {
+    return await sessionRefreshInFlight;
+  } finally {
+    sessionRefreshInFlight = null;
+  }
+}
+
 async function apiCall(method, path, body) {
   const headers = {
     "Content-Type": "application/json",
@@ -286,8 +353,19 @@ async function apiCall(method, path, body) {
 
   const opts = { method, headers };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API_BASE}${path}`, opts);
-  const data = await res.json();
+  let res = await fetch(`${API_BASE}${path}`, opts);
+  let data = await res.json().catch(() => ({}));
+  if (!res.ok && res.status === 401 && sessionToken && path !== "/api/session") {
+    await refreshSessionAfterAuthFailure();
+    const retryHeaders = {
+      ...headers,
+    };
+    if (sessionToken) retryHeaders["x-session-token"] = sessionToken;
+    const retryOpts = { method, headers: retryHeaders };
+    if (body) retryOpts.body = JSON.stringify(body);
+    res = await fetch(`${API_BASE}${path}`, retryOpts);
+    data = await res.json().catch(() => ({}));
+  }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }

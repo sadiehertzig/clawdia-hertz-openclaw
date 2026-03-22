@@ -9,6 +9,7 @@ export const DEFAULT_CHAT_ID = process.env.OPENCLAW_TELEGRAM_CHAT_ID || "";
 export const SHARING_MODE = process.env.COPYLOBSTA_SHARING_MODE || "disabled";
 export const SHARING_ENABLED = SHARING_MODE === "on_demand";
 export const SHARING_TTL_MINUTES = parseInt(process.env.COPYLOBSTA_SHARING_TTL_MINUTES || "45", 10);
+export const SESSION_ENCRYPTION_KEY = process.env.COPYLOBSTA_SESSION_ENCRYPTION_KEY || "";
 // Internal auth: shared secret for host bot -> CopyLobsta calls (e.g. /api/launch)
 export const LAUNCH_SECRET = process.env.COPYLOBSTA_LAUNCH_SECRET || "";
 // AWS / CloudFormation

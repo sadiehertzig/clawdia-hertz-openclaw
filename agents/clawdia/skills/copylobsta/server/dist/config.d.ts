@@ -4,6 +4,7 @@ export declare const DEFAULT_CHAT_ID: string;
 export declare const SHARING_MODE: string;
 export declare const SHARING_ENABLED: boolean;
 export declare const SHARING_TTL_MINUTES: number;
+export declare const SESSION_ENCRYPTION_KEY: string;
 export declare const LAUNCH_SECRET: string;
 export declare const AWS_REGION: string;
 export declare const CFN_TEMPLATE_URL: string;

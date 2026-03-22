@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { existsSync, mkdirSync, rmSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as store from "../lib/sessionStore.js";
 
 // We test the session store by importing it — it uses a module-level SESSIONS_DIR.
 // To isolate tests, we set up and tear down the data/sessions directory.
@@ -20,19 +21,9 @@ function cleanSessions() {
   }
 }
 
-// Dynamic import to avoid module-level side effects caching
-async function importStore() {
-  // Use timestamp to bust module cache
-  const mod = await import(`../lib/sessionStore.js?t=${Date.now()}`);
-  return mod;
-}
-
 describe("sessionStore", () => {
-  let store: typeof import("../lib/sessionStore.js");
-
-  beforeEach(async () => {
+  beforeEach(() => {
     cleanSessions();
-    store = await import("../lib/sessionStore.js");
   });
 
   afterEach(() => {
@@ -117,4 +108,5 @@ describe("sessionStore", () => {
     expect(new Date(s2.updatedAt).getTime()).toBeGreaterThan(0);
     expect(s2.state).toBe("AWS_ACCOUNT_CHECK");
   });
+
 });

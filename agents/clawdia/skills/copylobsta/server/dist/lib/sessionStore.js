@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, openSync, closeSync, unlinkSync, constants } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { SESSION_ENCRYPTION_KEY } from "../config.js";
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const SESSIONS_DIR = resolve(__dirname, "..", "..", "..", "data", "sessions");
 // Ensure sessions directory exists
@@ -16,6 +17,7 @@ function lockPath(userId) {
 }
 const LOCK_TIMEOUT_MS = 5000;
 const LOCK_RETRY_MS = 50;
+const ENCRYPTION_ALGO = "aes-256-gcm";
 /** Acquire a file lock for a user session. Spins until acquired or timeout. */
 function acquireLock(userId) {
     const lock = lockPath(userId);
@@ -77,6 +79,72 @@ function normalizeSession(session) {
         sharingSession: session.sharingSession || null,
     };
 }
+function getSessionKey() {
+    const raw = SESSION_ENCRYPTION_KEY.trim();
+    if (!raw)
+        return null;
+    return createHash("sha256").update(raw, "utf8").digest();
+}
+function isEncryptedEnvelope(value) {
+    if (!value || typeof value !== "object")
+        return false;
+    const v = value;
+    return v.encrypted === true && v.version === 1 && typeof v.iv === "string" && typeof v.tag === "string" && typeof v.data === "string";
+}
+function encryptSession(session, key) {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv(ENCRYPTION_ALGO, key, iv);
+    const plaintext = Buffer.from(JSON.stringify(session), "utf8");
+    const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    const envelope = {
+        version: 1,
+        encrypted: true,
+        iv: iv.toString("base64"),
+        tag: tag.toString("base64"),
+        data: ciphertext.toString("base64"),
+    };
+    return JSON.stringify(envelope, null, 2);
+}
+function decryptSession(raw, key) {
+    const parsed = JSON.parse(raw);
+    if (!isEncryptedEnvelope(parsed)) {
+        throw new Error("Session file is not encrypted envelope format");
+    }
+    const iv = Buffer.from(parsed.iv, "base64");
+    const tag = Buffer.from(parsed.tag, "base64");
+    const data = Buffer.from(parsed.data, "base64");
+    const decipher = createDecipheriv(ENCRYPTION_ALGO, key, iv);
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+    return normalizeSession(JSON.parse(plaintext));
+}
+function readSessionFromPath(path) {
+    const raw = readFileSync(path, "utf-8");
+    const key = getSessionKey();
+    const parsed = JSON.parse(raw);
+    if (isEncryptedEnvelope(parsed)) {
+        if (!key) {
+            throw new Error("Encrypted session file found but COPYLOBSTA_SESSION_ENCRYPTION_KEY is missing");
+        }
+        return decryptSession(raw, key);
+    }
+    // Backward-compatible plaintext read for migration.
+    const session = normalizeSession(parsed);
+    if (key) {
+        writeFileSync(path, encryptSession(session, key));
+    }
+    return session;
+}
+function writeSessionToPath(path, session) {
+    const normalized = normalizeSession(session);
+    const key = getSessionKey();
+    if (key) {
+        writeFileSync(path, encryptSession(normalized, key));
+        return;
+    }
+    writeFileSync(path, JSON.stringify(normalized, null, 2));
+}
 function createDefaultSession(userId, username) {
     const now = new Date().toISOString();
     return {
@@ -133,13 +201,12 @@ export function getOrCreate(userId, username = null) {
     return withLock(String(userId), () => {
         const path = sessionPath(String(userId));
         if (existsSync(path)) {
-            const raw = readFileSync(path, "utf-8");
-            const normalized = normalizeSession(JSON.parse(raw));
-            writeFileSync(path, JSON.stringify(normalized, null, 2));
-            return normalized;
+            const loaded = readSessionFromPath(path);
+            writeSessionToPath(path, loaded);
+            return loaded;
         }
         const session = createDefaultSession(userId, username);
-        writeFileSync(path, JSON.stringify(session, null, 2));
+        writeSessionToPath(path, session);
         return session;
     });
 }
@@ -147,7 +214,7 @@ export function getOrCreate(userId, username = null) {
 export function reset(userId, username = null) {
     return withLock(String(userId), () => {
         const session = createDefaultSession(userId, username);
-        writeFileSync(sessionPath(String(userId)), JSON.stringify(session, null, 2));
+        writeSessionToPath(sessionPath(String(userId)), session);
         return session;
     });
 }
@@ -156,15 +223,13 @@ export function get(userId) {
     const path = sessionPath(String(userId));
     if (!existsSync(path))
         return null;
-    const raw = readFileSync(path, "utf-8");
-    return normalizeSession(JSON.parse(raw));
+    return readSessionFromPath(path);
 }
 /** Find a session by its setup token (for instance callback auth). */
 export function findBySetupToken(token) {
     const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith(".json"));
     for (const file of files) {
-        const raw = readFileSync(resolve(SESSIONS_DIR, file), "utf-8");
-        const session = normalizeSession(JSON.parse(raw));
+        const session = readSessionFromPath(resolve(SESSIONS_DIR, file));
         if (session.setupToken === token) {
             return session;
         }
@@ -176,8 +241,7 @@ export function findActiveSessions() {
     const files = readdirSync(SESSIONS_DIR).filter(f => f.endsWith(".json"));
     const active = [];
     for (const file of files) {
-        const raw = readFileSync(resolve(SESSIONS_DIR, file), "utf-8");
-        const session = normalizeSession(JSON.parse(raw));
+        const session = readSessionFromPath(resolve(SESSIONS_DIR, file));
         if (!["COMPLETE", "ABANDONED", "FAILED"].includes(session.state)) {
             active.push(session);
         }
@@ -189,8 +253,7 @@ export function findActiveByFriendId(friendId) {
     const path = sessionPath(String(friendId));
     if (!existsSync(path))
         return null;
-    const raw = readFileSync(path, "utf-8");
-    const session = normalizeSession(JSON.parse(raw));
+    const session = readSessionFromPath(path);
     if (["COMPLETE", "ABANDONED", "FAILED"].includes(session.state))
         return null;
     return session;
@@ -219,7 +282,7 @@ export function update(userId, patch) {
             deploy: { ...session.deploy, ...(patch.deploy || {}) },
         };
         const normalized = normalizeSession(updated);
-        writeFileSync(sessionPath(String(userId)), JSON.stringify(normalized, null, 2));
+        writeSessionToPath(sessionPath(String(userId)), normalized);
         return normalized;
     });
 }

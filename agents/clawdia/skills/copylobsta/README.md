@@ -33,6 +33,7 @@ node dist/index.js
 - `COPYLOBSTA_PORT` — Server port (default: 3457)
 - `COPYLOBSTA_SHARING_MODE` — `disabled` (default) or `on_demand`
 - `COPYLOBSTA_LAUNCH_SECRET` — Shared secret required for `/api/launch`
+- `COPYLOBSTA_SESSION_ENCRYPTION_KEY` — Required in production; encrypts `data/sessions/*.json` at rest
 - `COPYLOBSTA_SHARING_TTL_MINUTES` — Optional on-demand tunnel lifetime (default: 45)
 - `COPYLOBSTA_TEMPLATE_S3_BUCKET` — Private S3 bucket for template (recommended)
 - `COPYLOBSTA_TEMPLATE_S3_KEY` — Template object key in S3 (recommended)
