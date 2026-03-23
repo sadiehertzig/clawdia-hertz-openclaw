@@ -212,3 +212,13 @@ export async function stopTunnelByUrl(url: string): Promise<void> {
   if (!key) return;
   await stopTunnel(key);
 }
+
+export function refreshTunnelByUrl(url: string): { url: string; expiresAt: string; pid: number | null } | null {
+  const key = keyByUrl.get(url);
+  if (!key) return null;
+  const tunnel = active.get(key);
+  if (!tunnel) return null;
+  if (tunnel.process.exitCode !== null) return null;
+  const expiresAt = renewTunnelLease(tunnel, getTunnelTtlMs());
+  return { url: tunnel.url, expiresAt, pid: tunnel.pid };
+}

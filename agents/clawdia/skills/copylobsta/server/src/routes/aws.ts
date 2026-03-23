@@ -7,7 +7,7 @@ import * as sessionStore from "../lib/sessionStore.js";
 import { transition } from "../lib/stateMachine.js";
 import { buildQuickCreateUrl, generateSessionToken } from "../lib/cfnUrl.js";
 import { resolveTemplateUrl } from "../lib/templateUrl.js";
-import { ensureOnDemandTunnel } from "../lib/tunnelManager.js";
+import { ensureOnDemandTunnel, refreshTunnelByUrl } from "../lib/tunnelManager.js";
 
 const router = Router();
 const ALLOWED_PROVIDERS = new Set(["anthropic", "gemini", "openai", "telegram"]);
@@ -36,6 +36,19 @@ function normalizeSetupBaseUrl(raw: string): string {
   }
   parsed.hash = "";
   return parsed.origin;
+}
+
+function resolveRequestOrigin(req: Request): string | null {
+  const host = (req.headers["x-forwarded-host"] as string || req.headers.host || "").split(",")[0]?.trim();
+  if (!host) return null;
+  const protoHeader = (req.headers["x-forwarded-proto"] as string || "").split(",")[0]?.trim();
+  const proto = protoHeader || req.protocol || "http";
+  const candidate = `${proto}://${host}`;
+  try {
+    return normalizeSetupBaseUrl(candidate);
+  } catch {
+    return null;
+  }
 }
 
 function safeEquals(provided: string, expected: string): boolean {
@@ -108,22 +121,44 @@ router.get("/api/aws/quick-create-url", async (req, res) => {
       return;
     }
 
-    // Re-confirm tunnel on every quick-create request.
-    // This self-heals after service restarts because in-memory tunnel state is lost across restarts.
-    const chatKey = String(session.groupChatId ?? session.friendTelegramId);
-    const tunnel = await ensureOnDemandTunnel(chatKey);
-    let callbackBase = tunnel.url;
+    const requestOrigin = resolveRequestOrigin(req);
+    const launchOrigin = (() => {
+      try {
+        return normalizeSetupBaseUrl(sharing.launchUrl);
+      } catch {
+        return null;
+      }
+    })();
+
+    let callbackBase = launchOrigin || requestOrigin || "";
+    let refreshed = callbackBase ? refreshTunnelByUrl(callbackBase) : null;
+
+    // If the current session launch URL no longer maps to an active tunnel, try the current request origin.
+    if (!refreshed && requestOrigin && requestOrigin !== callbackBase) {
+      callbackBase = requestOrigin;
+      refreshed = refreshTunnelByUrl(callbackBase);
+    }
+
+    // Last resort: recreate/verify tunnel by chat key.
+    if (!refreshed) {
+      const chatKey = String(session.groupChatId ?? session.friendTelegramId);
+      const tunnel = await ensureOnDemandTunnel(chatKey);
+      callbackBase = tunnel.url;
+      refreshed = tunnel;
+    }
+
     if (
-      sharing.launchUrl !== tunnel.url ||
-      sharing.expiresAt !== tunnel.expiresAt ||
+      sharing.launchUrl !== callbackBase ||
+      sharing.expiresAt !== refreshed.expiresAt ||
+      sharing.tunnelPid !== refreshed.pid ||
       sharing.status !== "active"
     ) {
       sessionStore.update(user.id, {
         sharingSession: {
           ...sharing,
-          launchUrl: tunnel.url,
-          expiresAt: tunnel.expiresAt,
-          tunnelPid: tunnel.pid,
+          launchUrl: callbackBase,
+          expiresAt: refreshed.expiresAt,
+          tunnelPid: refreshed.pid,
           status: "active",
         },
       });

@@ -194,4 +194,16 @@ export async function stopTunnelByUrl(url) {
         return;
     await stopTunnel(key);
 }
+export function refreshTunnelByUrl(url) {
+    const key = keyByUrl.get(url);
+    if (!key)
+        return null;
+    const tunnel = active.get(key);
+    if (!tunnel)
+        return null;
+    if (tunnel.process.exitCode !== null)
+        return null;
+    const expiresAt = renewTunnelLease(tunnel, getTunnelTtlMs());
+    return { url: tunnel.url, expiresAt, pid: tunnel.pid };
+}
 //# sourceMappingURL=tunnelManager.js.map
