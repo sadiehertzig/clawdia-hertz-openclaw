@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { Resolver } from "node:dns/promises";
 import { accessSync, constants } from "node:fs";
 import { join } from "node:path";
 import { PORT, SHARING_TTL_MINUTES } from "../config.js";
@@ -19,6 +20,8 @@ const PROBE_TOTAL_WAIT_MS = 20_000;
 const PROBE_RETRY_MS = 1_000;
 const active = new Map<string, ActiveTunnel>();
 const keyByUrl = new Map<string, string>();
+const publicDnsResolver = new Resolver();
+publicDnsResolver.setServers(["1.1.1.1", "1.0.0.1"]);
 
 function extractTunnelUrl(line: string): string | null {
   const match = line.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
@@ -65,10 +68,27 @@ async function probeTunnel(url: string): Promise<boolean> {
   }
 }
 
+async function probeTunnelPublicDns(url: string): Promise<boolean> {
+  try {
+    const host = new URL(url).hostname;
+    const [a4, a6] = await Promise.allSettled([
+      publicDnsResolver.resolve4(host),
+      publicDnsResolver.resolve6(host),
+    ]);
+    const hasA4 = a4.status === "fulfilled" && a4.value.length > 0;
+    const hasA6 = a6.status === "fulfilled" && a6.value.length > 0;
+    return hasA4 || hasA6;
+  } catch {
+    return false;
+  }
+}
+
 async function waitForTunnelReady(url: string): Promise<void> {
   const deadline = Date.now() + PROBE_TOTAL_WAIT_MS;
   while (Date.now() < deadline) {
     if (await probeTunnel(url)) return;
+    // Fallback for hosts where local DNS (systemd-resolved) lags or caches NXDOMAIN.
+    if (await probeTunnelPublicDns(url)) return;
     await new Promise((r) => setTimeout(r, PROBE_RETRY_MS));
   }
   throw new Error(`Cloudflare tunnel did not become reachable in time: ${url}`);
