@@ -1,7 +1,0 @@
-node_modules/
-src/
-__tests__/
-*.test.ts
-tsconfig.json
-package-lock.json
-.DS_Store
