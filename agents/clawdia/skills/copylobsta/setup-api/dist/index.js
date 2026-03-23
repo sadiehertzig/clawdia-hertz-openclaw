@@ -203,14 +203,22 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
             });
             // Give the gateway a moment to start, then verify it's running.
             await new Promise((r) => setTimeout(r, 2000));
-            const status = execFileSync("systemctl", ["--user", "is-active", "openclaw-gateway"], { timeout: 5_000, stdio: "pipe", env }).toString().trim();
+            let status = "unknown";
+            try {
+                status = execFileSync("systemctl", ["--user", "is-active", "openclaw-gateway"], { timeout: 5_000, stdio: "pipe", env }).toString().trim();
+            }
+            catch (isActiveErr) {
+                // is-active exits non-zero for inactive/failed — read stdout from the error.
+                const stderr = isActiveErr.stdout?.toString().trim() || "";
+                status = stderr || "failed";
+            }
             if (status !== "active") {
                 let logs = "";
                 try {
-                    logs = execFileSync("journalctl", ["--user", "-u", "openclaw-gateway", "-n", "20", "--no-pager"], { timeout: 5_000, stdio: "pipe", env }).toString();
+                    logs = execFileSync("journalctl", ["--user", "-u", "openclaw-gateway", "-n", "30", "--no-pager"], { timeout: 5_000, stdio: "pipe", env }).toString();
                 }
                 catch { /* best effort */ }
-                throw new Error(`openclaw-gateway is ${status}.\n${logs}`);
+                throw new Error(`openclaw-gateway is '${status}'. Recent logs:\n${logs}`);
             }
         });
         await runDeployStep("health_check", async () => {
