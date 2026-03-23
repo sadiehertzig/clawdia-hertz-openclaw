@@ -38,6 +38,7 @@ node_modules/
 
 # CopyLobsta runtime state (generated during onboarding flows)
 /agents/clawdia/skills/copylobsta/data/spotlight-history.json
+/agents/clawdia/skills/copylobsta/data/sessions/
 
 # autoimprove-tbc runtime outputs (generated)
 agents/clawdia/skills/autoimprove-tbc/targets/
