@@ -25,4 +25,6 @@ export const TEMPLATE_S3_KEY = process.env.COPYLOBSTA_TEMPLATE_S3_KEY || "";
 export const TEMPLATE_S3_REGION = process.env.COPYLOBSTA_TEMPLATE_S3_REGION || AWS_REGION;
 export const TEMPLATE_URL_TTL_SECONDS = parseInt(process.env.COPYLOBSTA_TEMPLATE_URL_TTL_SECONDS || "600", 10);
 export const RELEASE_TAG = process.env.COPYLOBSTA_RELEASE_TAG || "main";
+export const ALLOW_UNSIGNED_INSTANCE_CALLBACK =
+  (process.env.COPYLOBSTA_ALLOW_UNSIGNED_INSTANCE_CALLBACK || "1") !== "0";
 export const SETUP_API_PORT = 8080;

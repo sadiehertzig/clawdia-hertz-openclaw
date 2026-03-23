@@ -13,5 +13,6 @@ export declare const TEMPLATE_S3_KEY: string;
 export declare const TEMPLATE_S3_REGION: string;
 export declare const TEMPLATE_URL_TTL_SECONDS: number;
 export declare const RELEASE_TAG: string;
+export declare const ALLOW_UNSIGNED_INSTANCE_CALLBACK: boolean;
 export declare const SETUP_API_PORT = 8080;
 //# sourceMappingURL=config.d.ts.map

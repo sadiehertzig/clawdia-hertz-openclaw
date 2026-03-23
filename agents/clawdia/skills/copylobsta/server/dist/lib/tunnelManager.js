@@ -12,6 +12,9 @@ const active = new Map();
 const keyByUrl = new Map();
 const publicDnsResolver = new Resolver();
 publicDnsResolver.setServers(["1.1.1.1", "1.0.0.1"]);
+function getTunnelTtlMs() {
+    return Math.max(5, SHARING_TTL_MINUTES) * 60_000;
+}
 function extractTunnelUrl(line) {
     const match = line.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
     return match ? match[0] : null;
@@ -84,20 +87,33 @@ async function waitForTunnelReady(url) {
     }
     throw new Error(`Cloudflare tunnel did not become reachable in time: ${url}`);
 }
+function renewTunnelLease(tunnel, ttlMs) {
+    clearTimeout(tunnel.timeout);
+    const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+    const timeout = setTimeout(() => {
+        void stopTunnel(tunnel.key);
+    }, ttlMs);
+    timeout.unref();
+    tunnel.expiresAt = expiresAt;
+    tunnel.timeout = timeout;
+    active.set(tunnel.key, tunnel);
+    return expiresAt;
+}
 export async function ensureOnDemandTunnel(key) {
+    const ttlMs = getTunnelTtlMs();
     const existing = active.get(key);
     if (existing && Date.now() < new Date(existing.expiresAt).getTime()) {
         // If process is gone or URL is unreachable, recycle the tunnel.
         const stillRunning = existing.process.exitCode === null;
         if (stillRunning && await probeTunnel(existing.url)) {
-            return { url: existing.url, expiresAt: existing.expiresAt, pid: existing.pid };
+            const expiresAt = renewTunnelLease(existing, ttlMs);
+            return { url: existing.url, expiresAt, pid: existing.pid };
         }
         await stopTunnel(key);
     }
     else if (existing) {
         await stopTunnel(key);
     }
-    const ttlMs = Math.max(5, SHARING_TTL_MINUTES) * 60_000;
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cloudflaredBin = resolveCloudflaredBinary();
     return new Promise((resolve, reject) => {

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
-import { BOT_TOKEN } from "../config.js";
+import { ALLOW_UNSIGNED_INSTANCE_CALLBACK, BOT_TOKEN } from "../config.js";
 import { requireUser } from "../lib/telegramAuth.js";
 import * as sessionStore from "../lib/sessionStore.js";
 import { transition } from "../lib/stateMachine.js";
@@ -143,24 +143,31 @@ router.post("/api/aws/instance-callback", (req, res) => {
             res.status(400).json({ error: "Missing sessionToken, instanceId, or setupBaseUrl" });
             return;
         }
-        if (!providedSignature) {
-            res.status(401).json({ error: "Missing callback signature" });
-            return;
-        }
         const session = sessionStore.findBySetupToken(sessionToken);
         if (!session) {
             res.status(401).json({ error: "Invalid session token" });
             return;
         }
-        if (!session.callbackSecret) {
-            res.status(401).json({ error: "Callback signature is not configured for this session" });
+        if (providedSignature) {
+            if (!session.callbackSecret) {
+                res.status(401).json({ error: "Callback signature is not configured for this session" });
+                return;
+            }
+            const rawPayload = req.rawBody ?? JSON.stringify(req.body || {});
+            const expectedSignature = computeCallbackSignature(session.callbackSecret, rawPayload);
+            if (!safeEquals(providedSignature, expectedSignature)) {
+                res.status(401).json({ error: "Invalid callback signature" });
+                return;
+            }
+        }
+        else if (session.callbackSecret && !ALLOW_UNSIGNED_INSTANCE_CALLBACK) {
+            res.status(401).json({ error: "Missing callback signature" });
             return;
         }
-        const rawPayload = req.rawBody ?? JSON.stringify(req.body || {});
-        const expectedSignature = computeCallbackSignature(session.callbackSecret, rawPayload);
-        if (!safeEquals(providedSignature, expectedSignature)) {
-            res.status(401).json({ error: "Invalid callback signature" });
-            return;
+        else if (session.callbackSecret && ALLOW_UNSIGNED_INSTANCE_CALLBACK) {
+            console.warn("Accepting unsigned instance callback for compatibility", {
+                friendTelegramId: session.friendTelegramId,
+            });
         }
         const safeSetupBaseUrl = normalizeSetupBaseUrl(setupBaseUrl);
         const updated = sessionStore.update(session.friendTelegramId, {
