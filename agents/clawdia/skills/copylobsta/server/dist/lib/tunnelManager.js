@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { PORT, SHARING_TTL_MINUTES } from "../config.js";
 const START_TIMEOUT_MS = 25_000;
 const KILL_GRACE_MS = 3_000;
+const PROBE_TIMEOUT_MS = 3_000;
+const PROBE_TOTAL_WAIT_MS = 20_000;
+const PROBE_RETRY_MS = 1_000;
 const active = new Map();
 const keyByUrl = new Map();
 function extractTunnelUrl(line) {
@@ -34,12 +37,45 @@ function resolveCloudflaredBinary() {
     }
     return "cloudflared";
 }
+async function probeTunnel(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    try {
+        const res = await fetch(`${url}/api/health`, {
+            method: "GET",
+            signal: controller.signal,
+        });
+        return res.ok;
+    }
+    catch {
+        return false;
+    }
+    finally {
+        clearTimeout(timer);
+    }
+}
+async function waitForTunnelReady(url) {
+    const deadline = Date.now() + PROBE_TOTAL_WAIT_MS;
+    while (Date.now() < deadline) {
+        if (await probeTunnel(url))
+            return;
+        await new Promise((r) => setTimeout(r, PROBE_RETRY_MS));
+    }
+    throw new Error(`Cloudflare tunnel did not become reachable in time: ${url}`);
+}
 export async function ensureOnDemandTunnel(key) {
     const existing = active.get(key);
     if (existing && Date.now() < new Date(existing.expiresAt).getTime()) {
-        return { url: existing.url, expiresAt: existing.expiresAt, pid: existing.pid };
+        // If process is gone or URL is unreachable, recycle the tunnel.
+        const stillRunning = existing.process.exitCode === null;
+        if (stillRunning && await probeTunnel(existing.url)) {
+            return { url: existing.url, expiresAt: existing.expiresAt, pid: existing.pid };
+        }
+        await stopTunnel(key);
     }
-    await stopTunnel(key);
+    else if (existing) {
+        await stopTunnel(key);
+    }
     const ttlMs = Math.max(5, SHARING_TTL_MINUTES) * 60_000;
     const expiresAt = new Date(Date.now() + ttlMs).toISOString();
     const cloudflaredBin = resolveCloudflaredBinary();
@@ -70,7 +106,12 @@ export async function ensureOnDemandTunnel(key) {
             };
             active.set(key, tunnel);
             keyByUrl.set(url, key);
-            resolve({ url, expiresAt, pid: proc.pid ?? null });
+            waitForTunnelReady(url)
+                .then(() => resolve({ url, expiresAt, pid: proc.pid ?? null }))
+                .catch(async (err) => {
+                await stopTunnel(key);
+                reject(err instanceof Error ? err : new Error(String(err)));
+            });
         };
         proc.stdout?.on("data", onOutput);
         proc.stderr?.on("data", onOutput);
