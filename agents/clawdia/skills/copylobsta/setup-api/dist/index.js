@@ -193,9 +193,25 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
             console.log("Configured .env with API keys from Secrets Manager");
         });
         await runDeployStep("start_pm2", async () => {
-            execFileSync("bash", ["-lc",
-                "systemctl --user daemon-reload 2>&1 || true; systemctl --user enable --now openclaw-gateway 2>&1 || systemctl --user restart openclaw-gateway 2>&1 || pm2 restart openclaw-gateway 2>&1",
-            ], { timeout: 30_000, stdio: "pipe" });
+            const uid = execFileSync("id", ["-u"], { stdio: "pipe" }).toString().trim();
+            const env = { ...process.env, XDG_RUNTIME_DIR: `/run/user/${uid}` };
+            execFileSync("systemctl", ["--user", "daemon-reload"], {
+                timeout: 10_000, stdio: "pipe", env,
+            });
+            execFileSync("systemctl", ["--user", "enable", "--now", "openclaw-gateway"], {
+                timeout: 20_000, stdio: "pipe", env,
+            });
+            // Give the gateway a moment to start, then verify it's running.
+            await new Promise((r) => setTimeout(r, 2000));
+            const status = execFileSync("systemctl", ["--user", "is-active", "openclaw-gateway"], { timeout: 5_000, stdio: "pipe", env }).toString().trim();
+            if (status !== "active") {
+                let logs = "";
+                try {
+                    logs = execFileSync("journalctl", ["--user", "-u", "openclaw-gateway", "-n", "20", "--no-pager"], { timeout: 5_000, stdio: "pipe", env }).toString();
+                }
+                catch { /* best effort */ }
+                throw new Error(`openclaw-gateway is ${status}.\n${logs}`);
+            }
         });
         await runDeployStep("health_check", async () => {
             await new Promise((r) => setTimeout(r, 3000));
@@ -221,9 +237,12 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
                 throw new Error(`Telegram bot mismatch: expected @${expectedBot}, got @${liveUsername}`);
             }
             // Verify the full OpenClaw channel wiring is healthy (not just token validity).
+            const hcUid = execFileSync("id", ["-u"], { stdio: "pipe" }).toString().trim();
+            const hcEnv = { ...process.env, XDG_RUNTIME_DIR: `/run/user/${hcUid}` };
             const healthJson = execFileSync("bash", ["-lc", "openclaw health --json"], {
                 timeout: 20_000,
                 stdio: "pipe",
+                env: hcEnv,
             }).toString("utf8");
             const parsed = JSON.parse(healthJson);
             const tg = parsed.channels?.telegram;
@@ -234,9 +253,9 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         });
         await runDeployStep("auto_restart", async () => {
             try {
-                execFileSync("bash", ["-lc",
-                    "pm2 save 2>&1 || systemctl --user enable openclaw-gateway 2>&1 || true",
-                ], { timeout: 10_000, stdio: "pipe" });
+                const arUid = execFileSync("id", ["-u"], { stdio: "pipe" }).toString().trim();
+                const arEnv = { ...process.env, XDG_RUNTIME_DIR: `/run/user/${arUid}` };
+                execFileSync("systemctl", ["--user", "enable", "openclaw-gateway"], { timeout: 10_000, stdio: "pipe", env: arEnv });
             }
             catch {
                 // Best effort
