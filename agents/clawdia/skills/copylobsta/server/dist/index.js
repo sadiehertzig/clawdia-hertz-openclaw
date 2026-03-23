@@ -33,13 +33,20 @@ function checkRateLimit(map, key, now, max) {
     }
     return { ok: true, retryAfterSec: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)) };
 }
-// Basic security headers for API + miniapp responses.
+// Basic security headers.
 app.use((req, res, next) => {
+    const isMiniApp = req.path.startsWith("/miniapp");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if (isMiniApp) {
+        // Telegram Mini Apps are embedded; do not send X-Frame-Options: DENY here.
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors https://web.telegram.org https://*.telegram.org https://t.me; base-uri 'self'; form-action 'self'");
+    }
+    else {
+        res.setHeader("X-Frame-Options", "DENY");
+        res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    }
     next();
 });
 if (SHARING_ENABLED) {
