@@ -724,6 +724,12 @@ async function triggerDeploy() {
       link.href = `https://t.me/${deployBotUsername}`;
       link.textContent = `Open @${deployBotUsername}`;
     }
+    if (currentSession.state === "FAILED") {
+      const failedMsg = document.getElementById("failed-error-message");
+      if (failedMsg && data.error) {
+        failedMsg.textContent = data.error;
+      }
+    }
     showScreen(currentSession.state);
   } catch (err) {
     // Show deploy error with retry option

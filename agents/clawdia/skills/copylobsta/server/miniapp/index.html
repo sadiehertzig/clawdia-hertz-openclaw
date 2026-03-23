@@ -855,6 +855,30 @@
       </div>
     </div>
 
+    <!-- Failed state -->
+    <div id="screen-FAILED" class="screen">
+      <div class="screen-header">
+        <div class="lobsta-icon">&#x1F99E;</div>
+        <h1>Deployment Failed</h1>
+      </div>
+      <div class="screen-body">
+        <div class="card" style="border-left: 4px solid #e74c3c;">
+          <h3>Something went wrong</h3>
+          <p id="failed-error-message">The deployment didn't complete. This usually means the server couldn't start or connect to Telegram.</p>
+        </div>
+        <div class="card">
+          <h3>What to try</h3>
+          <ul class="checklist">
+            <li>Re-open CopyLobsta with <code>/copylobsta</code> and try again</li>
+            <li>Double-check your BotFather token is correct</li>
+            <li>Make sure the CloudFormation stack finished creating in AWS Console</li>
+            <li>If it keeps failing, delete the CloudFormation stack and start fresh</li>
+          </ul>
+        </div>
+        <button class="btn-primary" onclick="location.reload()">Retry</button>
+      </div>
+    </div>
+
     <!-- Placeholder (fallback for any unmapped states) -->
     <div id="screen-placeholder" class="screen">
       <div class="screen-header">
