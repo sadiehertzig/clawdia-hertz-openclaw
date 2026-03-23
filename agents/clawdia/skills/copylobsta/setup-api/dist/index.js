@@ -104,25 +104,38 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
     const deployAsync = async () => {
         const { writeFile } = await import("node:fs/promises");
         const homeDir = process.env.HOME || "/home/openclaw";
-        const repoDir = resolve(process.env.COPYLOBSTA_REPO_DIR || resolve(homeDir, "copylobsta"));
-        const homeRepoDir = resolve(homeDir, "copylobsta");
+        const repoDir = resolve(process.env.COPYLOBSTA_REPO_DIR || resolve(homeDir, "clawdia-hertz-openclaw"));
+        const allowedRepoRoots = [
+            resolve(homeDir, "copylobsta"),
+            resolve(homeDir, "clawdia-hertz-openclaw"),
+        ];
         // Step 1: Verify repo exists (no git pull from moving HEAD)
         await runDeployStep("clone_repo", async () => {
             if (!existsSync(repoDir)) {
                 throw new Error(`CopyLobsta repo not found at ${repoDir}`);
             }
             // Restrict deploy writes to expected install paths.
-            if (repoDir !== homeRepoDir && !repoDir.startsWith(`${homeRepoDir}/`)) {
-                throw new Error(`COPYLOBSTA_REPO_DIR must be inside ${homeRepoDir}`);
+            const isAllowedRepo = allowedRepoRoots.some((root) => repoDir === root || repoDir.startsWith(`${root}/`));
+            if (!isAllowedRepo) {
+                throw new Error(`COPYLOBSTA_REPO_DIR must be inside: ${allowedRepoRoots.join(", ")}`);
             }
         });
         // Step 2: Install dependencies
         await runDeployStep("install_deps", async () => {
-            execFileSync("bash", ["setup/install.sh"], {
-                cwd: repoDir,
-                timeout: 180_000,
-                stdio: "pipe",
-            });
+            const installScriptCandidates = [
+                resolve(repoDir, "setup", "install.sh"),
+                resolve(repoDir, "agents", "clawdia", "skills", "copylobsta", "setup", "install.sh"),
+            ];
+            const installScript = installScriptCandidates.find((p) => existsSync(p));
+            if (installScript) {
+                execFileSync("bash", [installScript], {
+                    cwd: repoDir,
+                    timeout: 180_000,
+                    stdio: "pipe",
+                });
+                return;
+            }
+            console.warn(`No install script found at expected paths: ${installScriptCandidates.join(", ")}. Skipping install_deps.`);
         });
         // Step 3: Write SOUL.md
         await runDeployStep("write_soul", async () => {
@@ -138,25 +151,15 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
             // Configuration is handled by install.sh and env vars.
         });
         await runDeployStep("start_pm2", async () => {
-            try {
-                execFileSync("bash", ["-lc",
-                    "systemctl --user restart openclaw-gateway 2>&1 || pm2 restart openclaw-gateway 2>&1 || true",
-                ], { timeout: 30_000, stdio: "pipe" });
-            }
-            catch {
-                // Best effort
-            }
+            execFileSync("bash", ["-lc",
+                "systemctl --user daemon-reload 2>&1 || true; systemctl --user enable --now openclaw-gateway 2>&1 || systemctl --user restart openclaw-gateway 2>&1 || pm2 restart openclaw-gateway 2>&1",
+            ], { timeout: 30_000, stdio: "pipe" });
         });
         await runDeployStep("health_check", async () => {
             await new Promise((r) => setTimeout(r, 3000));
-            try {
-                execFileSync("bash", ["-lc",
-                    "curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health || true",
-                ], { timeout: 10_000, stdio: "pipe" });
-            }
-            catch {
-                // Best effort
-            }
+            execFileSync("bash", ["-lc",
+                "curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health",
+            ], { timeout: 10_000, stdio: "pipe" });
         });
         await runDeployStep("auto_restart", async () => {
             try {
