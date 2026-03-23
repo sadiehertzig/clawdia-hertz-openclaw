@@ -156,18 +156,17 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
       ];
       const installScript = installScriptCandidates.find((p) => existsSync(p));
 
-      if (installScript) {
-        execFileSync("bash", [installScript], {
-          cwd: repoDir,
-          timeout: 180_000,
-          stdio: "pipe",
-        });
-        return;
+      if (!installScript) {
+        throw new Error(
+          `Missing install script. Expected one of: ${installScriptCandidates.join(", ")}`,
+        );
       }
 
-      console.warn(
-        `No install script found at expected paths: ${installScriptCandidates.join(", ")}. Skipping install_deps.`,
-      );
+      execFileSync("bash", [installScript], {
+        cwd: repoDir,
+        timeout: 180_000,
+        stdio: "pipe",
+      });
     });
 
     // Step 3: Write SOUL.md
@@ -205,6 +204,34 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         ],
         { timeout: 10_000, stdio: "pipe" }
       );
+
+      // Ensure Telegram channel is actually configured and token validates.
+      const expectedBot = (botUsername || "").replace(/^@/, "").trim().toLowerCase();
+      const healthJson = execFileSync("bash", ["-lc", "openclaw health --json"], {
+        timeout: 20_000,
+        stdio: "pipe",
+      }).toString("utf8");
+      const parsed = JSON.parse(healthJson) as {
+        ok?: boolean;
+        channels?: {
+          telegram?: {
+            configured?: boolean;
+            probe?: { ok?: boolean; bot?: { username?: string } };
+            accounts?: Record<string, { probe?: { ok?: boolean; bot?: { username?: string } } }>;
+          };
+        };
+      };
+      const tg = parsed.channels?.telegram;
+      const probe = tg?.accounts?.default?.probe || tg?.probe;
+      const liveUsername = probe?.bot?.username?.toLowerCase() || "";
+      if (!parsed.ok || !tg?.configured || !probe?.ok) {
+        throw new Error("openclaw health check failed: Telegram channel is not ready");
+      }
+      if (expectedBot && liveUsername && liveUsername !== expectedBot) {
+        throw new Error(
+          `Telegram bot mismatch: expected @${expectedBot}, got @${liveUsername}`,
+        );
+      }
     });
 
     await runDeployStep("auto_restart", async () => {
