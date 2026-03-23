@@ -12,6 +12,28 @@ const SECRET_NAMES = {
     openai: "openai-api-key",
     telegram: "telegram-bot-token",
 };
+/**
+ * Read a secret value from Secrets Manager.
+ * Returns empty string only if the secret genuinely doesn't exist.
+ * Throws on IAM/network/service errors so callers can distinguish
+ * "not stored yet" from "infrastructure broken."
+ */
+export async function readSecret(provider) {
+    const name = SECRET_NAMES[provider];
+    if (!name)
+        return "";
+    try {
+        const result = await client.send(new GetSecretValueCommand({ SecretId: `${PREFIX}${name}` }));
+        return result.SecretString?.trim() || "";
+    }
+    catch (err) {
+        const code = err.name;
+        if (code === "ResourceNotFoundException") {
+            return "";
+        }
+        throw err;
+    }
+}
 export async function writeSecret(provider, value) {
     const name = SECRET_NAMES[provider];
     if (!name) {

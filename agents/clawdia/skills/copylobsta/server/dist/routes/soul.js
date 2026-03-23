@@ -130,6 +130,7 @@ router.post("/api/soul/deploy", async (req, res) => {
                 userMarkdown: session.user.draftMarkdown,
                 githubUsername: session.credentials.githubUsername,
                 botUsername: session.credentials.botUsername,
+                chatId: String(session.friendTelegramId),
             }),
         });
         const deployData = await deployRes.json();

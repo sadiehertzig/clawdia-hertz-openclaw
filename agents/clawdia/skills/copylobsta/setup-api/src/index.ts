@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { validateKey } from "./keyValidator.js";
-import { writeSecret } from "./secretsWriter.js";
+import { readSecret, writeSecret } from "./secretsWriter.js";
 
 const PORT = parseInt(process.env.SETUP_API_PORT || "8080", 10);
 const BIND_ADDR = process.env.SETUP_BIND || "127.0.0.1";
@@ -101,11 +101,12 @@ async function runDeployStep(name: string, fn: () => Promise<void>): Promise<voi
 }
 
 app.post("/setup/deploy", requireToken, async (req, res) => {
-  const { soulMarkdown, userMarkdown, botUsername } = req.body as {
+  const { soulMarkdown, userMarkdown, botUsername, chatId } = req.body as {
     soulMarkdown?: string;
     userMarkdown?: string;
     githubUsername?: string;
     botUsername?: string;
+    chatId?: string;
   };
 
   if (!soulMarkdown) {
@@ -182,7 +183,55 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
     });
 
     await runDeployStep("configure", async () => {
-      // Configuration is handled by install.sh and env vars.
+      const { readFile } = await import("node:fs/promises");
+      const envPath = resolve(homeDir, ".openclaw", ".env");
+
+      // Read validated keys from Secrets Manager and write them to .env
+      const [telegramToken, anthropicKey, geminiKey, openaiKey] =
+        await Promise.all([
+          readSecret("telegram"),
+          readSecret("anthropic"),
+          readSecret("gemini"),
+          readSecret("openai"),
+        ]);
+
+      if (!telegramToken) {
+        throw new Error(
+          "Telegram bot token not found in Secrets Manager. " +
+          "Make sure you entered the token from BotFather during setup.",
+        );
+      }
+
+      let envContent = await readFile(envPath, "utf-8");
+
+      // Helper: set an env var value in the .env file content.
+      // Updates existing key or appends if missing.
+      const setEnvVar = (key: string, value: string) => {
+        const pattern = new RegExp(`^${key}=.*$`, "m");
+        if (pattern.test(envContent)) {
+          envContent = envContent.replace(pattern, `${key}=${value}`);
+        } else {
+          envContent += `\n${key}=${value}`;
+        }
+      };
+
+      setEnvVar("OPENCLAW_TELEGRAM_BOT_TOKEN", telegramToken);
+      setEnvVar("TELEGRAM_BOT_TOKEN", telegramToken);
+      // Set the default chat ID only if not already configured.
+      // This is the friend's DM — the bot's initial "home" conversation.
+      if (chatId) {
+        const existingChatId = envContent.match(/^OPENCLAW_TELEGRAM_CHAT_ID=(.+)$/m)?.[1]?.trim();
+        if (!existingChatId) {
+          setEnvVar("OPENCLAW_TELEGRAM_CHAT_ID", chatId);
+        }
+      }
+      if (anthropicKey) setEnvVar("ANTHROPIC_API_KEY", anthropicKey);
+      if (geminiKey) setEnvVar("GEMINI_API_KEY", geminiKey);
+      if (openaiKey) setEnvVar("OPENAI_API_KEY", openaiKey);
+      setEnvVar("USE_AWS_SECRETS", "true");
+
+      await writeFile(envPath, envContent, "utf-8");
+      console.log("Configured .env with API keys from Secrets Manager");
     });
 
     await runDeployStep("start_pm2", async () => {
@@ -205,8 +254,31 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         { timeout: 10_000, stdio: "pipe" }
       );
 
-      // Ensure Telegram channel is actually configured and token validates.
+      // Verify the bot token actually works against Telegram's API.
+      const token = await readSecret("telegram");
+      if (!token) {
+        throw new Error("Telegram bot token not found in Secrets Manager after configure step");
+      }
+      const getMeRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      if (!getMeRes.ok) {
+        throw new Error(`Telegram bot token failed getMe check (HTTP ${getMeRes.status})`);
+      }
+      const getMeData = (await getMeRes.json()) as {
+        ok?: boolean;
+        result?: { username?: string };
+      };
+      if (!getMeData.ok) {
+        throw new Error("Telegram getMe returned ok=false — token may be revoked");
+      }
+      const liveUsername = getMeData.result?.username?.toLowerCase() || "";
       const expectedBot = (botUsername || "").replace(/^@/, "").trim().toLowerCase();
+      if (expectedBot && liveUsername && liveUsername !== expectedBot) {
+        throw new Error(
+          `Telegram bot mismatch: expected @${expectedBot}, got @${liveUsername}`,
+        );
+      }
+
+      // Verify the full OpenClaw channel wiring is healthy (not just token validity).
       const healthJson = execFileSync("bash", ["-lc", "openclaw health --json"], {
         timeout: 20_000,
         stdio: "pipe",
@@ -223,14 +295,8 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
       };
       const tg = parsed.channels?.telegram;
       const probe = tg?.accounts?.default?.probe || tg?.probe;
-      const liveUsername = probe?.bot?.username?.toLowerCase() || "";
       if (!parsed.ok || !tg?.configured || !probe?.ok) {
         throw new Error("openclaw health check failed: Telegram channel is not ready");
-      }
-      if (expectedBot && liveUsername && liveUsername !== expectedBot) {
-        throw new Error(
-          `Telegram bot mismatch: expected @${expectedBot}, got @${liveUsername}`,
-        );
       }
     });
 
