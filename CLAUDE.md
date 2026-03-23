@@ -54,11 +54,13 @@ Skills follow the OpenClaw/AgentSkills format:
 
 ### Existing Skills
 
-All skills live as real directories in `agents/clawdia/skills/`. Copylobsta
-(`/home/openclaw/copylobsta/agents/main/skills/`) symlinks back here to avoid
-drift until skills are deployed independently. **Do not reverse the symlink
-direction** — Clawdia must own the real files so that `Path.resolve()` and git
-operations stay inside this repo.
+Most skills live as real directories in `agents/clawdia/skills/`.
+
+`copylobsta` is the exception:
+- Source of truth lives in `/home/openclaw/copylobsta/agents/main/skills/copylobsta`
+- `agents/clawdia/skills/copylobsta` is a symlink into that repo
+- Do not copy the files back into this repo or point the deploy repo at this workspace again
+- Any fresh-instance/bootstrap change needed by CopyLobsta must land in the `copylobsta` repo first
 
 - academic-deep-research
 - agent-browser
