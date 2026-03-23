@@ -62,7 +62,7 @@ router.post("/api/launch", async (req, res) => {
     const groupId = req.body?.group_id || null;
     const requestedUserId = req.body?.user_id || null;
     const rawFresh = req.body?.fresh;
-    const forceFresh = rawFresh === true || rawFresh === "1" || rawFresh === 1;
+    const forceFresh = rawFresh === undefined ? true : (rawFresh === true || rawFresh === "1" || rawFresh === 1);
     const userId = requestedUserId || (!groupId ? chatId : null);
     if (!userId) {
       res.status(400).json({
