@@ -145,7 +145,14 @@ app.use((req, res, next) => {
 });
 
 // Static: Mini App frontend
-app.use("/miniapp", express.static(resolve(__dirname, "..", "miniapp")));
+app.use("/miniapp", express.static(resolve(__dirname, "..", "miniapp"), {
+  setHeaders(res) {
+    // Telegram webviews can cache aggressively; force fresh miniapp assets.
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  },
+}));
 
 // API routes
 app.use(healthRouter);
