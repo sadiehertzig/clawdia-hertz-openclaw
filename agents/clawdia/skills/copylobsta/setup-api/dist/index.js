@@ -200,7 +200,7 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
         await runDeployStep("health_check", async () => {
             await new Promise((r) => setTimeout(r, 3000));
             execFileSync("bash", ["-lc",
-                "curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health",
+                "curl -sf http://localhost:18789/healthz",
             ], { timeout: 10_000, stdio: "pipe" });
             // Verify the bot token actually works against Telegram's API.
             const token = await readSecret("telegram");

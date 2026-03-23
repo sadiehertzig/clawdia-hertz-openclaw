@@ -249,7 +249,7 @@ app.post("/setup/deploy", requireToken, async (req, res) => {
       execFileSync(
         "bash",
         ["-lc",
-        "curl -sf http://localhost:3000/health || curl -sf http://localhost:8443/health",
+        "curl -sf http://localhost:18789/healthz",
         ],
         { timeout: 10_000, stdio: "pipe" }
       );
