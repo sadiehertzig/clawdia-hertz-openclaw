@@ -4,6 +4,7 @@ set -euo pipefail
 OLD_BASE="/home/ubuntu"
 OLD_PATH="$OLD_BASE/clawdia-hertz-openclaw"
 REPOS=()
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
   cat <<USAGE
@@ -11,8 +12,8 @@ Usage: $(basename "$0") [--repo /path/to/repo]...
 
 Fails if OLD_PATH appears in tracked files.
 Defaults to:
-  - /home/openclaw/clawdia-hertz-openclaw
-  - /home/openclaw/copylobsta
+  - current repo root ($ROOT_DIR)
+  - copylobsta repo (auto-detected sibling or \$HOME/copylobsta)
 USAGE
 }
 
@@ -39,10 +40,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ${#REPOS[@]} -eq 0 ]]; then
-  REPOS=(
-    "/home/openclaw/clawdia-hertz-openclaw"
-    "/home/openclaw/copylobsta"
-  )
+  REPOS=("$ROOT_DIR")
+  if [[ -n "${COPYLOBSTA_REPO_DIR:-}" ]]; then
+    REPOS+=("$COPYLOBSTA_REPO_DIR")
+  elif [[ -d "$ROOT_DIR/../copylobsta/.git" ]]; then
+    REPOS+=("$ROOT_DIR/../copylobsta")
+  elif [[ -d "$HOME/copylobsta/.git" ]]; then
+    REPOS+=("$HOME/copylobsta")
+  fi
 fi
 
 found=0

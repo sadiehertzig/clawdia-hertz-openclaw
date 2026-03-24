@@ -36,7 +36,7 @@ Clawdia is the primary agent. Her skills are in `agents/clawdia/skills/`.
 
 ## Workspace Canonical Path
 
-- Canonical workspace: `/home/openclaw/clawdia-hertz-openclaw`
+- Canonical workspace: this checked-out repository root.
 - Legacy ubuntu workspace path is retired and must not be used in active configs/scripts.
 - Ubuntu copy is rollback archive only for 7 days:
   - `/home/ubuntu/archive/clawdia-hertz-openclaw-20260319-154316`
@@ -57,7 +57,8 @@ Skills follow the OpenClaw/AgentSkills format:
 Most skills live as real directories in `agents/clawdia/skills/`.
 
 `copylobsta` is the exception:
-- Source of truth lives in `/home/openclaw/copylobsta/agents/main/skills/copylobsta`
+- Source of truth lives in `COPYLOBSTA_REPO_DIR/agents/main/skills/copylobsta`.
+- If `COPYLOBSTA_REPO_DIR` is unset, local checks auto-detect `../copylobsta` first, then `$HOME/copylobsta`.
 - `agents/clawdia/skills/copylobsta` is a symlink into that repo
 - Do not copy the files back into this repo or point the deploy repo at this workspace again
 - Any fresh-instance/bootstrap change needed by CopyLobsta must land in the `copylobsta` repo first
