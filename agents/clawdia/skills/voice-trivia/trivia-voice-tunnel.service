@@ -1,0 +1,20 @@
+[Unit]
+Description=Trivia Voice Cloudflare Tunnel
+After=network-online.target
+Before=trivia-voice.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.openclaw/.env
+ExecStartPre=/usr/bin/bash -lc '\
+  f="$HOME/.openclaw/.env"; \
+  [ -r "$f" ] || { echo "[tunnel-preflight] missing or unreadable $f"; exit 1; }; \
+  tn=$(grep -E "^TRIVIA_TUNNEL_NAME=" "$f" | tail -n 1 | cut -d= -f2-); \
+  [ -n "$tn" ] || { echo "[tunnel-preflight] TRIVIA_TUNNEL_NAME missing in $f"; exit 1; }; \
+  command -v cloudflared >/dev/null 2>&1 || { echo "[tunnel-preflight] cloudflared not found in PATH"; exit 1; }'
+ExecStart=/usr/bin/bash -lc 'exec cloudflared tunnel --no-autoupdate run "${TRIVIA_TUNNEL_NAME}"'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

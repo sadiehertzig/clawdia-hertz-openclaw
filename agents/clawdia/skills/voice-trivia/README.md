@@ -43,6 +43,20 @@ node index.js
 
 Install `trivia-voice.service` to run as a background service.
 
+## Hardening (recommended)
+
+By default, voice trivia uses a quick Cloudflare tunnel (`cloudflared tunnel --url`) which generates a random URL on each restart. This causes `APP_BASE_URL` to go stale, breaking the Telegram Mini App launcher.
+
+**Fix:** Use a named Cloudflare tunnel for a stable URL. See [HARDENING.md](HARDENING.md) for setup steps.
+
+Quick version:
+```bash
+cloudflared tunnel create trivia-voice
+cloudflared tunnel route dns trivia-voice trivia.yourdomain.com
+# Set APP_BASE_URL=https://trivia.yourdomain.com in ~/.openclaw/.env
+systemctl --user enable --now trivia-voice-tunnel
+```
+
 ## Dependencies
 
 - Node.js >= 20

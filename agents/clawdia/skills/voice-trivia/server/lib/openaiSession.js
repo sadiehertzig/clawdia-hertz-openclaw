@@ -58,16 +58,17 @@ export async function createSession(firstName = "Player") {
     },
     body: JSON.stringify({
       model: "gpt-4o-realtime-preview-2025-06-03",
-      voice: "nova",
+      voice: "shimmer",
       instructions: buildPersonalityPrompt(firstName),
       tools: TOOL_DEFS,
       tool_choice: "auto",
       input_audio_transcription: { model: "gpt-4o-mini-transcribe" },
       turn_detection: {
         type: "server_vad",
-        threshold: 0.8,
+        threshold: 0.9,
         prefix_padding_ms: 400,
-        silence_duration_ms: 800,
+        silence_duration_ms: 1000,
+        interrupt_response: false,
       },
     }),
   });

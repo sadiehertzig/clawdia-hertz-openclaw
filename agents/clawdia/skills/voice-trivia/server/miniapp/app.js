@@ -77,7 +77,13 @@ async function startSession() {
 
   try {
     // 1. Get microphone
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
 
     // 2. Get ephemeral session from our server
     const sessionRes = await fetch(`${API_BASE}/api/session`, {
