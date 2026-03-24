@@ -61,6 +61,7 @@ Most skills live as real directories in `agents/clawdia/skills/`.
 - `agents/clawdia/skills/copylobsta` is a symlink into that repo
 - Do not copy the files back into this repo or point the deploy repo at this workspace again
 - Any fresh-instance/bootstrap change needed by CopyLobsta must land in the `copylobsta` repo first
+- Verify the link locally with `scripts/check-copylobsta-source-of-truth.sh`
 
 - academic-deep-research
 - agent-browser
